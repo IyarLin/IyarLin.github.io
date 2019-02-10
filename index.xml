@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>A Hugo website</title>
-    <link>/</link>
-    <description>Recent content on A Hugo website</description>
+    <title>Just be-cause</title>
+    <link>https://iyarlin.github.io/</link>
+    <description>Recent content on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Fri, 08 Feb 2019 00:00:00 +0000</lastBuildDate>
     
-	<atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="https://iyarlin.github.io/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
       <title>&#34;Correlation is not causation&#34;. So what is?</title>
-      <link>/2019/02/08/correlation-is-not-causation-so-what-is/</link>
+      <link>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</link>
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
+      <guid>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
       <description>Intro Machine learning applications have been growing in volume and scope rapidly over the last few years. What’s Causal inference, how is it different than plain good ole’ ML and when should you consider using it? In this report I try giving a short and concrete answer by using an example.
  A typical data science task Imagine we’re tasked by the marketing team to find the effect of raising marketing spend on sales.</description>
     </item>
     
     <item>
       <title>About</title>
-      <link>/about/</link>
+      <link>https://iyarlin.github.io/about/</link>
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
-      <guid>/about/</guid>
+      <guid>https://iyarlin.github.io/about/</guid>
       <description>I belive the best way to learn data-science is by doing. In this blog I share my learning experiences in the topics of Causal-Inference and general ML through simulation studies and hands on experimentation.
 Posts in this blog are graciously hosted also on the R-bloggers blog.
 This blog structure and layout are based on the &amp;ldquo;hello world&amp;rdquo; example website for the blogdown package.</description>

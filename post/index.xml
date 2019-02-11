@@ -2,21 +2,21 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Posts on Just be-cause</title>
-    <link>https://iyarlin.github.io/post/</link>
+    <link>/post/</link>
     <description>Recent content in Posts on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <lastBuildDate>Fri, 08 Feb 2019 00:00:00 +0000</lastBuildDate>
     
-        <atom:link href="https://iyarlin.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+        <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
       <title>&#34;Correlation is not causation&#34;. So what is?</title>
-      <link>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</link>
+      <link>/2019/02/08/correlation-is-not-causation-so-what-is/</link>
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
-      <guid>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
+      <guid>/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
       <description>
 
 
@@ -93,7 +93,7 @@
 &lt;div id=&#34;first-approach-plot-bi-variate-relationship&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;First approach: plot bi-variate relationship&lt;/h2&gt;
 &lt;p&gt;Many of us would start off by plotting a scatter plot of sales by marketing:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20scatter%20plot-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20scatter%20plot-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the relationship seen in the graph is actually the opposite of what we’d expected! It looks like increasing marketing actually decreases sales. Indeed, not only correlation isn’t causation, at times it can show a relation opposite to the true causation.&lt;/p&gt;
 &lt;p&gt;Fitting a simple linear model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + \epsilon\)&lt;/span&gt; would yield the following coefficients: (note &lt;span class=&#34;math inline&#34;&gt;\(r\)&lt;/span&gt; is a regression coefficient where’s &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; is a true parameter in the structural equations)&lt;/p&gt;
 &lt;table style=&#34;width:32%;&#34;&gt;
@@ -152,7 +152,7 @@
 &lt;p&gt;Quite baffled by the results obtained so far we turn to consult the marketing team and we learn that in highly competitive markets the team would usually increase marketing spend (this is reflected in the coefficient &lt;span class=&#34;math inline&#34;&gt;\(\beta_4 = 0.6\)&lt;/span&gt; above). So it’s possible that competition is a “confounding” factor: when we observe high marketing spend there’s also high competition thus leading to lower sales.&lt;/p&gt;
 &lt;p&gt;Also, we notice that marketing probably affects visits to our site and those visits in turn affect sales.&lt;/p&gt;
 &lt;p&gt;We can visualize these feature inter-dependencies with a directed a-cyclic graph (DAG):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;So it would make sense to account for the confounding competition by adding it to our regression. Adding visits to our model however somehow “blocks” or “absorbs” the effect of marketing on sales so we should omit it from our model.&lt;/p&gt;
 &lt;p&gt;Fitting the model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + r_2comp + \epsilon\)&lt;/span&gt; yields the coefficients below:&lt;/p&gt;
 &lt;table style=&#34;width:44%;&#34;&gt;
@@ -187,9 +187,9 @@
 &lt;h2&gt;Backdoor criteria&lt;/h2&gt;
 &lt;p&gt;One of the most basic algorithms that can obtain the correct adjustment set is the “Backdoor-criteria” developed by J. Pearl. In a nutshell it seeks adjustment sets that block every “spurious” paths between our “exposure” variable (e.g. marketing) and “outcome” variable (e.g. sales) while keeping directed baths open.&lt;/p&gt;
 &lt;p&gt;Consider for example the DAG below where we’re interested in finding the effect of x5 on x10:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20large%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20large%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Using the backdoor-criterion (implemented in the R package “dagitty”) we can find the correct adjustment set:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20adjustemnt%20sets-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20adjustemnt%20sets-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;how-to-obtain-model-dags&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;How to obtain model DAGs?&lt;/h2&gt;

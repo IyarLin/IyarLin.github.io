@@ -28,8 +28,7 @@
 &lt;h1&gt;A typical data science task&lt;/h1&gt;
 &lt;p&gt;Imagine we’re tasked by the marketing team to find the effect of raising marketing spend on sales. We have at our disposal records of marketing spend (mkt), visits to our website (visits), sales, and competition index (comp).&lt;/p&gt;
 &lt;p&gt;We’ll simulate a dataset using a set of equations (also called structural equations):&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[sales = \beta_1vists + \beta_2comp + \epsilon_1\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[vists = \beta_3mkt + \epsilon_2\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[mkt = \beta_4comp + \epsilon_3\]&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;with &lt;span class=&#34;math inline&#34;&gt;\(\{\beta_1, \beta_2, \beta_3\, \beta_4\} = \{0.3, -0.9, 0.5, 0.6\}\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[sales = \beta_1vists + \beta_2comp + \epsilon_1\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[vists = \beta_3mkt + \epsilon_2\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[mkt = \beta_4comp + \epsilon_3\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[comp = \epsilon_4\]&lt;/span&gt; with &lt;span class=&#34;math inline&#34;&gt;\(\{\beta_1, \beta_2, \beta_3\, \beta_4\} = \{0.3, -0.9, 0.5, 0.6\}\)&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;All data presented in graphs or used to fit models below is simulated from the above equations.&lt;/p&gt;
 &lt;p&gt;Below are the first few rows of the dataset:&lt;/p&gt;
 &lt;table style=&#34;width:46%;&#34;&gt;
@@ -205,7 +204,7 @@
 &lt;/div&gt;
 &lt;div id=&#34;further-reading&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Further reading&lt;/h2&gt;
-&lt;p&gt;To anyone curious to learn a bit more about the questions I’ve tried to answer in this report I’ll recommend reading the light-weight Technical Report by Pearl: &lt;a href=&#34;https://github.com/IyarLin/causal-inference/blob/master/miscellaneous%20files/The%20Seven%20Pillars%20of%20Causal%20Reasoning%20with%20Reflections%20on%20Machine%20Learning%20Pearl%202018.pdf&#34;&gt;The Seven Tools of Causal Inference with Reflections on Machine Learning&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;To anyone curious to learn a bit more about the questions I’ve tried to answer in this report I’ll recommend reading the light-weight Technical Report by Pearl: &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/The%20Seven%20Pillars%20of%20Causal%20Reasoning%20with%20Reflections%20on%20Machine%20Learning%20Pearl%202018.pdf&#34;&gt;The Seven Tools of Causal Inference with Reflections on Machine Learning&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;For a more in-depth introduction to Causal inference and the DAG machinery I’d recommend getting Pearl’s short book: &lt;a href=&#34;http://bayes.cs.ucla.edu/PRIMER/&#34;&gt;Causal Inference in Statistics - A Primer&lt;/a&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;

@@ -3,52 +3,52 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</loc>
+    <loc>/2019/02/08/correlation-is-not-causation-so-what-is/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/about/</loc>
+    <loc>/about/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/categories/</loc>
+    <loc>/categories/</loc>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/tags/causal-inference/</loc>
-    <lastmod>2019-02-08T00:00:00+00:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/</loc>
+    <loc>/tags/causal-inference/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/post/</loc>
+    <loc>/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/tags/r/</loc>
+    <loc>/post/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/categories/r/</loc>
+    <loc>/categories/r/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/tags/</loc>
+    <loc>/tags/r/</loc>
+    <lastmod>2019-02-08T00:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/tags/</loc>
     <lastmod>2019-02-08T00:00:00+00:00</lastmod>
     <priority>0</priority>
   </url>

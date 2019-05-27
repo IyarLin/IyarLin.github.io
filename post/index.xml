@@ -6,10 +6,553 @@
     <description>Recent content in Posts on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 08 Feb 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 20 May 2019 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Causal inference bake off (Kaggle style!)</title>
+      <link>/2019/05/20/causal-inference-bake-off-kaggle-style/</link>
+      <pubDate>Mon, 20 May 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/05/20/causal-inference-bake-off-kaggle-style/</guid>
+      <description>
+
+
+&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Intro&lt;/h1&gt;
+&lt;p&gt;On my last &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;few&lt;/a&gt; &lt;a href=&#34;https://iyarlin.github.io/blog/x-affects-y-what-does-that-even-mean/&#34;&gt;posts&lt;/a&gt; I’ve tried answering high level questions such as “What is Causal inference?”, “How is it different than ML?” and “When should I use it?”.&lt;/p&gt;
+&lt;p&gt;In this post we finally get our hands dirty with some Kaggle style Causal Inference algorithms bake off! In this competition I’ll pit some well known ML algorithms vs a few specialized Causal Inference (CI) algorithms and find out who’s hot and who’s not!&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;causal-inference-objectives-and-the-need-for-specialized-algorithms&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Causal Inference objectives and the need for specialized algorithms&lt;/h1&gt;
+&lt;div id=&#34;ate-average-treatment-effect&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;ATE: Average Treatment Effect&lt;/h2&gt;
+&lt;p&gt;So far we’ve learned that in order to estimate the causal dependence of &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; on &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; we need to use a set of features &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt; that satisfies the “Backdoor criteria”. We can then use the g-computation formula:&lt;/p&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{align}
+\mathbb{E}(Y|do(x)) = \sum_{z_B}f(x,z_B)P(z_B)
+\end{align}\]&lt;/span&gt;
+&lt;p&gt;where &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; is our target variable, &lt;span class=&#34;math inline&#34;&gt;\(do(x)\)&lt;/span&gt; is the action of &lt;strong&gt;setting&lt;/strong&gt; a treatment &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to a value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; (see my &lt;a href=&#34;https://iyarlin.github.io/blog/x-affects-y-what-does-that-even-mean/&#34;&gt;previuos post&lt;/a&gt; for more details on the do operator) and &lt;span class=&#34;math inline&#34;&gt;\(f(x,z_B) = \hat{\mathbb{E}}(Y|x,z_B)\)&lt;/span&gt; is some predictor function we can obtain using regular ML algorithms.&lt;/p&gt;
+&lt;p&gt;One might ask: if we can obtain &lt;span class=&#34;math inline&#34;&gt;\(f(x,z_B)\)&lt;/span&gt; using regular ML algorithms why the need for specialized CI algorithms?&lt;/p&gt;
+&lt;p&gt;The answer is that our objective in CI is different than our objective in classic ML: In ML we seek to predict the absolute value of Y given we observed &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; take value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt;: &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(Y|x)\)&lt;/span&gt;, while in CI we try to estimate the difference in the expected value of &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; across different assignment values &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; of &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt;. In the CI literature this quantity is termed “Average Treatment Effect” or in short &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt;. In the binary treatment case (where &lt;span class=&#34;math inline&#34;&gt;\(X \in \{0, 1\}\)&lt;/span&gt;) it’s defined as:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{3em} ATE := \mathbb{E}(Y|do(1)) -\mathbb{E}(Y|do(0))\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and in the general (not necessarily binary treatment) case it’s defined as:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{4em} ATE(x) := \frac{\partial \, \mathbb{E}(Y|do(x))}{\partial \, x}\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;To see why accurate estimation of &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(Y|x)\)&lt;/span&gt; doesn’t necessarily mean accurate estimation of the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; (and thus different objectives might require different algorithms) let’s look at an example:&lt;/p&gt;
+&lt;p&gt;Imagine we work for a company in the marketing industry. The treatment in this example is an automatic AI bidding robot we’ve developed recently as a value added service for our campaigns management platform. In order to demonstrate it works we sold it in a trial version for a few months, at the end of which we recorded for all our customers whether they took the trial (“treated”) or not (“untreated”), average campaign ROI and company size (“small” or “large”):&lt;/p&gt;
+&lt;table style=&#34;width:62%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;20%&#34; /&gt;
+&lt;col width=&#34;8%&#34; /&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;treatment&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;company size&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ROI&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Proportion&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;untreated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;small&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;treated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;small&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;untreated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;large&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;treated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;large&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;The first line reads “The average ROI for campaigns run by small companies who didn’t use our robot (untreated) is 1%. The proportion of those campaigns of the entire campaigns run on our platform is 0.1.&lt;/p&gt;
+&lt;p&gt;In order to use the g-computation formula (equation 1 above) we need to identify the correct adjustment set &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;After talking to some of our customers we learn that large companies usually employ large teams of analysts to optimize their campaigns, resulting in higher ROI compared with smaller companies. Having those large teams also means they have lower tendency to run our trial compared with small companies.&lt;/p&gt;
+&lt;p&gt;We thus assume the following DAG:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20dag-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Applying the “Backdoor criteria” to the DAG above we arrive at the insight that company size is a confounding factor and thus &lt;span class=&#34;math inline&#34;&gt;\(Z_B = \text{company size}\)&lt;/span&gt;. Equation 1 above reads in our case:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(\text{ROI}|do(\text{treatment})) = \sum_{\text{company size} \in \{\text{small,  large}\}}\mathbb{E}(\text{ROI}|\text{treatment, company size})P(\text{company size})\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We thus arrive at the quantities:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(\text{ROI}|do(\text{treated})) = 2\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(\text{ROI}|do(\text{untreated})) = 1\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and finally&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{3em} ATE = \mathbb{E}(\text{ROI}|do(\text{treated})) - \mathbb{E}(\text{ROI}|do(\text{untreated})) = 0.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Meaning the treatment (our robot) &lt;strong&gt;increases&lt;/strong&gt; ROI by 0.5% on average.&lt;/p&gt;
+&lt;p&gt;Next, let’s assume our data is noisy and the average ROI isn’t enough to estimate the expected ROI. We try to estimate the ROI using 2 models. Below we can see the model predictions (with absolute error in parenthesis):&lt;/p&gt;
+&lt;table&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;14%&#34; /&gt;
+&lt;col width=&#34;14%&#34; /&gt;
+&lt;col width=&#34;8%&#34; /&gt;
+&lt;col width=&#34;25%&#34; /&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;treat&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;comp size&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Prop&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ROI (true, unknown)&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ROI (model 1)&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ROI (model 2)&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;untreated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;small&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.5% (0.5%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0% (1%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;treated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;small&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.5% (0.5%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1% (1%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;untreated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;large&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.5% (0.5%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4% (1%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;treated&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;large&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.5% (0.5%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4% (1%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;We can see that model 1 is more accurate than model 2 in every row.&lt;/p&gt;
+&lt;p&gt;If we were to use model 1 to estimate the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; we’d get:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{mode1}} = 1.5\% \cdot (0.4 + 0.1) + 4.5\% \cdot (0.1 + 0.4) = 3\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{mode1}} = 1.5\% \cdot (0.4 + 0.1) + 5.5\% \cdot (0.1 + 0.4) = 3.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and finally&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{4em} \hat{ATE}_{\text{mode1}} = -0.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Meaning we estimate our product to &lt;strong&gt;decreases&lt;/strong&gt; ROI by 0.5%! Our estimate is not only wrong in magnitude but also in sign, meaning we can’t use it to market our product.&lt;/p&gt;
+&lt;p&gt;If we were to use model 2 however we’d get:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{model2}} = 1\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{model2}} = 0\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;and finally&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{4em} \hat{ATE}_{\text{model2}} = 0.5\%\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Arriving at the correct &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; estimate! So even though model 2 is less accurate than model 1 in estimating &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(\text{ROI})\)&lt;/span&gt;, it’s better in estimating the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;cate-conditional-average-treatment-effect&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;CATE: Conditional Average Treatment Effect&lt;/h2&gt;
+&lt;p&gt;Looking at the table above we see that while our product increases ROI by 0.5% &lt;strong&gt;on average&lt;/strong&gt;, it increases ROI by 1% for campaigns run by small companies, while not improving at all those run by large ones. We’ll be thus well advised to market our product to small companies.&lt;/p&gt;
+&lt;p&gt;In the CI literature the treatment effect conditioned on some other features &lt;span class=&#34;math inline&#34;&gt;\(z\)&lt;/span&gt; (such as company size) is fittingly termed “Conditional Average Treatment Effect” (&lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt;). In cases where the features conditioned on identify individuals uniquely (e.g. when at least one of the features conditioned on is continuous) it is also termed “Individual Treatment Effect”, which is a highly sought after quantity in personalized medicine for example. For the binary case the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; is defined as:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\quad CATE(z) := \mathbb{E}(Y|do(1),z) - \mathbb{E}(Y|do(0),z)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;In the general (not necessarily binary treatment) case it’s defined as:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{3em} CATE(x, z) := \frac{\partial \, \mathbb{E}(Y|do(X=x), Z=z)}{\partial \, x}\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Looking again at the model predictions above we can compare the actual vs predicted &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; for both models (with absolute error in parentheses):&lt;/p&gt;
+&lt;table&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;20%&#34; /&gt;
+&lt;col width=&#34;31%&#34; /&gt;
+&lt;col width=&#34;23%&#34; /&gt;
+&lt;col width=&#34;23%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;comapny size&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;CATE (true, unknown)&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;CATE (model 1)&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;CATE (model 2)&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;small&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0% (1%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1% (0%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;large&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1% (1%)&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0% (0%)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;Again, we can see that while model 1 was more accurate than model 2 in predicting &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(Y)\)&lt;/span&gt;, it entirely misses the true &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; while model 2 estimates it perfectly.&lt;/p&gt;
+&lt;p&gt;To summarize: Specialized CI algorithms might be necessary because different objectives might require different tools.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;an-example-with-simulated-data&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;An example with simulated data&lt;/h1&gt;
+&lt;p&gt;The example above might seem a bit ad hoc (which is true) but it is motivated by possibly real scenarios. I’ll demonstrate by simulating a small (100 observations) dataset from the example problem presented above and fit to it a simple decision tree. Below is the resulting tree:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the tree completely ignored the treatment! To see why that happened let’s take a look at the dataset distribution:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see in the graph above 2 dataset features that could potentially throw off regular ML algorithms when in comes to CI tasks:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;The variability due to the treatment is very small compared with that of other features in the dataset leading to an underestimate of the treatment effect (In the graph the variability due to company size is much higher than that of the treatment, which is why the decision tree disregarded the treatment).&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;The distribution of features among the treatment groups is highly skewed (in the graph we can see the treated units make up the vast majority in the small companies and a small minority in the large companies, making the comparison within each company size unreliable and thus estimating the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; very hard).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;In the showdown below we’ll see if more powerful ML algorithms can still hold their own against algorithms designed specifically for CI tasks.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-competition-setup&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;The competition setup&lt;/h1&gt;
+&lt;p&gt;It’s now time to setup the problem for our competition!&lt;/p&gt;
+&lt;p&gt;In this competition I’ll use a semi-synthetic dataset generated for the “Atlantic Causal Inference Conference” Data Analysis Challenge. The “real data” part comprises of the feature set &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt;, which contains 58 measurements taken from the &lt;a href=&#34;https://www.ncbi.nlm.nih.gov/pubmed/1371341&#34;&gt;Infant Health and Development Program&lt;/a&gt;. Those include features such as mother’s age, endocrine condition, child’s bilirubin etc.&lt;/p&gt;
+&lt;p&gt;Of the full feature set &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; only a subset of 8 features consists the correct adjustment set &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt; while the rest are nuisance (meaning they do not affect the treatment nor the target variables). We assume the correct adjustment set &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt; is unknown to the data scientist and thus the full feature set &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; is being fed to the model. This adds another layer of difficulty for our competitors to overcome.&lt;/p&gt;
+&lt;p&gt;The target variable &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; (continuous) and the treatment variable &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; (binary) are both simulated according to one of 12 Data Generating Processes (DGP). The DGPs differ by the following 2 traits:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Measurement error/residual noise. One of:
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;IID&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Group Correlated&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Heteroskedastic&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Non-additive (Non linear)&lt;br /&gt;
+&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;li&gt;Estimation difficulty. One of:
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Easy&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Medium&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Hard&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Estimation difficulty relates to 3 factors which can be either low (0) or high (1):&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Magnitude: the magnitude of the treatment effect&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Noise: signal to noise ratio&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Confounding: The strength of confounding (how different is the distribution of &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; between treatment and control)&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Below is a table showing the settings for those factors across the different difficulty scenarios:&lt;/p&gt;
+&lt;table style=&#34;width:64%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt; &lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;magnitude&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;noise&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;confounding&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;&lt;strong&gt;easy&lt;/strong&gt;&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;&lt;strong&gt;medium&lt;/strong&gt;&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;&lt;strong&gt;hard&lt;/strong&gt;&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;Full details about the data generation process can be found &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/Atlantic%20Causal%20Inference%20Conference%20Data%20Analysis%20Challenge%202017.pdf&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;From every &lt;span class=&#34;math inline&#34;&gt;\(DGP\)&lt;/span&gt; I simulate &lt;span class=&#34;math inline&#34;&gt;\(M =\)&lt;/span&gt; 20 datasets and measure an algorithm &lt;span class=&#34;math inline&#34;&gt;\(\: f\)&lt;/span&gt; performance using 2 measurements:&lt;/p&gt;
+&lt;p&gt;The the first measurement looks at how well the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; is estimated across all &lt;span class=&#34;math inline&#34;&gt;\(M =\)&lt;/span&gt; 20 simulations:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\quad RMSE_{ATE} = \sqrt{\sum_{m=1}^{M}\left(ATE - \hat{ATE}(m)\right)^2}\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We measure &lt;span class=&#34;math inline&#34;&gt;\(RMSE_{ATE}\)&lt;/span&gt; once across all 20 simulations.&lt;/p&gt;
+&lt;p&gt;The second is a type of “explained variability” or R-squared for &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\hspace{3em} R^{2}_{CATE} = 1 - \frac{var(CATE(z) - \hat{CATE}(z))}{var(CATE(z))}\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We measure &lt;span class=&#34;math inline&#34;&gt;\(R^{2}_{CATE}\)&lt;/span&gt; once for every simulation &lt;span class=&#34;math inline&#34;&gt;\(m\)&lt;/span&gt;.&lt;/p&gt;
+&lt;div id=&#34;wait-why-use-a-synthetic-dataset-instead-of-a-real-one-like-in-ml&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Wait, why use a synthetic dataset instead of a real one like in ML?&lt;/h2&gt;
+&lt;p&gt;In ML we can estimate our model &lt;span class=&#34;math inline&#34;&gt;\(\: f\)&lt;/span&gt; out-of-sample error by using samples &lt;span class=&#34;math inline&#34;&gt;\(\{y_i, f(x_i)\}\)&lt;/span&gt; (e.g. &lt;span class=&#34;math inline&#34;&gt;\(\frac{1}{n}\sum_{i=1}^{n}(y_i-f(x_i))^2\)&lt;/span&gt;). In CI however it’s not that simple. When estimating the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; often times &lt;span class=&#34;math inline&#34;&gt;\(z_i\)&lt;/span&gt; identifies a unit &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt; uniquely (e.g. if at least one of the features in &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; is continuous). Since a unit was either treated or untreated we only observe either &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i=1,z_i\}\)&lt;/span&gt; or &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i=0,z_i\}\)&lt;/span&gt;. So unlike in ML, we can’t benchmark our model using samples &lt;span class=&#34;math inline&#34;&gt;\(\{y_i|x_i=1,z_i - y_i|x_i=0,z_i \quad, \quad f(1,z_i) - f(0,z_i)\}\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;The situation I just alluded to is described in the CI literature many times in a problem setup commonly termed “counter factual inference”.&lt;/p&gt;
+&lt;p&gt;In the case of &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; the problem is compounded by the fact it’s a population parameter which means even if we knew the true &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt;, we’d only have a single sample for a given dataset to benchmark against.&lt;/p&gt;
+&lt;p&gt;For these reasons we need to use a synthetic/semi-synthetic dataset where we can simulate both &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i=1,z_i\}\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i=0,z_i\}\)&lt;/span&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-algorithms&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;The algorithms&lt;/h1&gt;
+&lt;p&gt;And now, let’s present our competitors!&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;ER: Elastic Net Regression. In this implementation shrinkage is not applied to &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to prevent the algorithm from setting the coefficient for &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to 0. I also includes pairwise interaction terms between the treatment &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; and all the features in &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; to enable &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; estimation.&lt;/li&gt;
+&lt;li&gt;RF: Random Forest. In this implementation &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is always added to the subset of features randomly selected in each tree node. Using default hyper-parameters.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;BART: &lt;a href=&#34;http://papers.nips.cc/paper/3084-bayesian-ensemble-learning.pdf&#34;&gt;Bayesian Additive Regression Trees&lt;/a&gt;. This algorithm has been demonstrated to have &lt;a href=&#34;https://doi.org/10.1198/jcgs.2010.08162&#34;&gt;good performance in Causal Inference tasks&lt;/a&gt;. Using default parameters.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;CF: &lt;a href=&#34;https://arxiv.org/abs/1610.01271&#34;&gt;Causal Forest&lt;/a&gt;. A form of generalized Random Forests geared towards Causal Inference tasks. See also this &lt;a href=&#34;https://github.com/grf-labs/grf/blob/master/REFERENCE.md&#34;&gt;manual&lt;/a&gt;. Using default parameters.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;BARTC: &lt;a href=&#34;https://github.com/vdorie/bartCause&#34;&gt;Baysian Additive Regression Trees - Causal version&lt;/a&gt;. This implementation uses &lt;a href=&#34;https://biostats.bepress.com/ucbbiostat/paper252/&#34;&gt;TMLE doubly robust estimation&lt;/a&gt;.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;In this competition I compare out-of-the-box algorithms. For this reason XGBoost and neural nets are not among the competitors as they requires a lot of hyper parameter / architecture fine tuning. I also left out all methods that rely on modeling the assignment mechanism solely (e.g. propensity score re-weighting) as they are mainly geared towards estimation of the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;And now, without further ado, the results!&lt;/p&gt;
+&lt;div id=&#34;ate&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;ATE&lt;/h2&gt;
+&lt;p&gt;Below I plot the estimated &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; box-plots along with the true &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; (dashed line).&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20ATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the error distribution doesn’t change the picture much. For that reason &lt;span class=&#34;math inline&#34;&gt;\(RMSE_{ATE}\)&lt;/span&gt; figures in the table below are averages over all error distributions:&lt;/p&gt;
+&lt;table style=&#34;width:53%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;algorithm&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;easy&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;medium&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;hard&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ER&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.087&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.246&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.362&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;RF&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.576&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.164&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.868&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;BART&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.003&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.798&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.779&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;CF&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.087&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.546&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.51&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;BARTC&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.001&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.038&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.052&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;Next thing we can notice is that for the easy case all algorithms nail the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; with the exception of RF while for the harder cases they all undershoot by a wide margin with the exception of BARTC which comes pretty close.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;cate&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;CATE&lt;/h2&gt;
+&lt;p&gt;Below I plot &lt;span class=&#34;math inline&#34;&gt;\(R^{2}_{CATE}\)&lt;/span&gt; box-plots and a red line at 0. We note that while in ML we’d usually think of &lt;span class=&#34;math inline&#34;&gt;\(R^{2} = 0\)&lt;/span&gt; as the baseline which is equal to “guessing” (since if we guess &lt;span class=&#34;math inline&#34;&gt;\(\hat{y}_i = \bar{y} \: \forall \, i\)&lt;/span&gt; we get &lt;span class=&#34;math inline&#34;&gt;\(R^{2} = 0\)&lt;/span&gt;) that wouldn’t be the case in CI. We note that &lt;span class=&#34;math inline&#34;&gt;\(\bar{CATE} = ATE\)&lt;/span&gt;, meaning in CI the equivalent of guessing &lt;span class=&#34;math inline&#34;&gt;\(\hat{y}_i = \bar{y} \: \forall \, i\)&lt;/span&gt; is guessing &lt;span class=&#34;math inline&#34;&gt;\(\hat{CATE}(z) = ATE \: \forall \, z\)&lt;/span&gt; and as we saw above that estimating the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; isn’t always straight forward.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20CATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Below I report the resulting average &lt;span class=&#34;math inline&#34;&gt;\(\bar{R^{2}}_{CATE}\)&lt;/span&gt;, averaging over all &lt;span class=&#34;math inline&#34;&gt;\(M\)&lt;/span&gt; datasets and all error types:&lt;/p&gt;
+&lt;table style=&#34;width:51%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;9%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;algorithm&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;easy&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;medium&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;hard&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ER&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.69&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.66&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.05&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;RF&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.6&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.42&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-6.77&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;BART&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.97&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.91&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.24&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;CF&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.96&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.77&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.15&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;BARTC&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.96&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.91&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.19&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the causal inference oriented algorithms all fair better than the regular ML ones. We can further see that BART and BARTC do best, yet all struggle in the hard case.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;final-conclusion&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Final conclusion&lt;/h1&gt;
+&lt;p&gt;It would seem BART based algorithms are best suited for CI tasks among the competing algorithms. This is not entirely unexpected as it was &lt;a href=&#34;https://doi.org/10.1198/jcgs.2010.08162&#34;&gt;reported&lt;/a&gt; in the past that BART does well for CI tasks. It’s also worth mentioning that the author of the package implementing BARTC is a member of the group that put together the dataset we used in this simulation study.&lt;/p&gt;
+&lt;p&gt;Think you know an algorithm that can pinpoint the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; even in the hard case? You can write them in the comments below, or feel free to use the &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/blog/causal-inference-bake-off-kaggle-style.Rmd&#34;&gt;code&lt;/a&gt; that produced this post to add them to the competition.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>&#34;X affects Y&#34;. What does that even mean?</title>
+      <link>/2019/03/13/x-affects-y-what-does-that-even-mean/</link>
+      <pubDate>Wed, 13 Mar 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/03/13/x-affects-y-what-does-that-even-mean/</guid>
+      <description>
+
+
+&lt;p&gt;On my &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt; I gave an intuitive demonstration of what’s causal inference and how it’s different than classic ML.&lt;/p&gt;
+&lt;p&gt;After receiving some feedback I realize that while the post was easy to digest, some confusion remains. In this post I’ll delve a bit deeper into what the “causal” in Causal Inference actually means.&lt;/p&gt;
+&lt;div id=&#34;analyzing-the-effect-of-x-on-y&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Analyzing the effect of X on Y&lt;/h1&gt;
+&lt;p&gt;The field of Causal inference deals with the question of “How does X affect Y?”. While ML practices include procedures that can potentially shed light on the topic, they are generally not well suited to give a concise and correct answer. To see why that’s the case, let’s review how ML is usually used to answer the question “How does X affect Y?”&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;partial-dependence-plots&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Partial dependence plots&lt;/h1&gt;
+&lt;p&gt;In classic ML we have some outcome variable &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; for which we’d like to predict the expected outcome given some observed feature set &lt;span class=&#34;math inline&#34;&gt;\(\{X,Z\}\)&lt;/span&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad \mathbb{E}(Y|X=x, Z=z)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;where &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is a feature of special interest (for which we’ll ask “How does X affect Y?”) and &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; are all other measurable features.&lt;/p&gt;
+&lt;p&gt;Using observations &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i,z_i\}, \, i = 1, \dots n\)&lt;/span&gt; we construct a predictor function &lt;span class=&#34;math inline&#34;&gt;\(f(x,z) = \hat{\mathbb{E}}(Y|X=x,Z=z)\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;When analyzing the marginal effect of a feature of interest &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; on the outcome variable &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; the standard practice in ML would be to use partial dependence plots. The partial dependence function is defined as&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad PD(x)=\mathbb{E}(Y|X=x)=\mathbb{E}_Z(f(x,Z))\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We can see that &lt;span class=&#34;math inline&#34;&gt;\(PD(x)\)&lt;/span&gt; involves plugging &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; to the prediction function &lt;span class=&#34;math inline&#34;&gt;\(f\)&lt;/span&gt; and marginalizing over the values of the other features &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(PD(x)\)&lt;/span&gt; is usually estimated by&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad \hat{PD}(x) = \frac{1}{n}\sum_{i=1}^{n} f(x,z_i)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Partial dependence plots (PDP) are then plotted with different values of &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; in the x-axis and the corresponding &lt;span class=&#34;math inline&#34;&gt;\(PD(x)\)&lt;/span&gt; on the y-axis.&lt;/p&gt;
+&lt;p&gt;A common misconception is thinking that PDP shows how different values of &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; &lt;strong&gt;affect&lt;/strong&gt; &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt;. For example &lt;a href=&#34;https://christophm.github.io/interpretable-ml-book/pdp.html&#34;&gt;Interpretable ML book&lt;/a&gt; states: “The partial dependence plot (short PDP or PD plot) shows the marginal effect one or two features have on the predicted outcome of a machine learning model”.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;https://www.kaggle.com/dansbecker/partial-dependence-plots&#34;&gt;kaggle partial dependence plots page&lt;/a&gt; states that PDP can answer questions such as “How much of wage differences between men and women are due solely to gender, as opposed to differences in education backgrounds or work experience?”&lt;/p&gt;
+&lt;p&gt;or&lt;/p&gt;
+&lt;p&gt;“Controlling for house characteristics, what impact do longitude and latitude have on home prices? To restate this, we want to understand how similarly sized houses would be priced in different areas, even if the homes actually at these sites are different sizes.”&lt;/p&gt;
+&lt;p&gt;To demonstrate why this is a misconception let’s briefly revisit the toy model introduced on my &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt;:&lt;/p&gt;
+&lt;p&gt;Imagine we’re tasked by the marketing team to find the effect of raising marketing spend on sales. We have at our disposal records of marketing spend (mkt), visits to our website (visits), sales, and competition index (comp).&lt;/p&gt;
+&lt;p&gt;We’ll simulate a dataset using a set of equations (also called structural equations):&lt;/p&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+sales = \beta_1vists + \beta_2comp + \epsilon_1
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+vists = \beta_3mkt + \epsilon_2
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+mkt = \beta_4comp + \epsilon_3
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+comp = \epsilon_4
+\end{equation}\]&lt;/span&gt;
+&lt;p&gt;with &lt;span class=&#34;math inline&#34;&gt;\(\{\beta_1, \beta_2, \beta_3\, \beta_4\} = \{0.3, -0.9, 0.5, 0.6\}\)&lt;/span&gt; and &lt;span class=&#34;math inline&#34;&gt;\(\epsilon_i \sim N(0,1)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We can think of the equations above as some data generating process (DGP) underlying our simulated dataset. Let’s label that process &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; with “obs” standing for “observed”.&lt;/p&gt;
+&lt;p&gt;Below I generate a sample &lt;span class=&#34;math inline&#34;&gt;\(\{sales_i, mkt_i, comp_i, visits_i\}, \, i \in 1, \dots, 10000\)&lt;/span&gt; and fit a linear regression model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + r_2visits + r_3comp + \epsilon\)&lt;/span&gt; on the first 8000 observations.&lt;/p&gt;
+&lt;p&gt;The &lt;span class=&#34;math inline&#34;&gt;\(PD\)&lt;/span&gt; plot between mkt and sales is shown below:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/simulate%20DGP%20obs-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the line is essentially flat, indicating no effect, though in fact we know that the line slope should be 0.15 (since &lt;span class=&#34;math inline&#34;&gt;\(\beta_1 \cdot \beta_3=0.15\)&lt;/span&gt;).&lt;/p&gt;
+&lt;p&gt;This seems quite surprising (though those who read my &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt; saw that result where the coefficient for mkt in the full ML model was around 0). The PDP shows none-sense results even though our model, while not perfect does capture a considerable degree of signal as shown in the plot of predicted vs actual sales (in the hold out test set of 2000 observations) below:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/ML%20model%20accuracy-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-do-operator&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;The “do” operator&lt;/h1&gt;
+&lt;p&gt;The reason why the relation found was so off is because the question “How does X affect Y” was so far ill defined and so were the tools we used to answer it.&lt;/p&gt;
+&lt;p&gt;We need to make a distinction between when we observe a feature &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; taking some specific value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; in which case we write &lt;span class=&#34;math inline&#34;&gt;\(X=x\)&lt;/span&gt;, and when we “force” or set &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to some value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; in which case we write &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;In order to understand the nature of the distinction between observing and setting &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; (or &lt;span class=&#34;math inline&#34;&gt;\(X=x\)&lt;/span&gt; vs &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt;) we first need to understand that by setting &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt; we change how future samples are generated. In our example setting &lt;span class=&#34;math inline&#34;&gt;\(do(mkt = x)\)&lt;/span&gt; means we delete the 3rd equation above (&lt;span class=&#34;math inline&#34;&gt;\(mkt = \beta_4comp + \epsilon_3\)&lt;/span&gt;) as mkt is no longer a function of comp. After setting mkt the rest of the variables are generated according to the remaining equations. We arrive at a new data generating process we’ll label &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; from which samples are generated after we set the mkt value.&lt;/p&gt;
+&lt;p&gt;In the plot below I show the a scatter plot of mkt and sales generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; on the left and those generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; after setting mkt to different values on the right:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/sim%20DGP%20do-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the joint distribution of mkt and sales is dramatically different before and after setting mkt. When we observe &lt;span class=&#34;math inline&#34;&gt;\(mkt=x\)&lt;/span&gt; (on the left pane) usually there’s also high competition leading to lower sales. When we set &lt;span class=&#34;math inline&#34;&gt;\(do(mkt=x)\)&lt;/span&gt; (on the right pane) that is no longer the case and indeed sales increase with mkt as expected. Finding the causal effect in this case does not even require a very complex model: the line slope on the right pane is 0.15 (which is the true causal effect).&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;the-challenge-with-causal-inference&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;The challenge with Causal inference&lt;/h1&gt;
+&lt;p&gt;In causal inference we’re interested in predicting the expected outcome of &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; given we &lt;strong&gt;set&lt;/strong&gt; &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to some value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; and we observed all other features &lt;span class=&#34;math inline&#34;&gt;\(Z\)&lt;/span&gt; take values &lt;span class=&#34;math inline&#34;&gt;\(z\)&lt;/span&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad \mathbb{E}(Y|do(X=x), Z=z)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;The corresponding causal effect of &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; on &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; (defined very similarly to the PD function above) would then be:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad \mathbb{E}(Y|do(X=x))=\mathbb{E}_Z(Y|do(X=x),Z=z)\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;The hard challenge involved with Causal inference stems from the fact that while &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(Y|do(X=x))\)&lt;/span&gt; is generated under &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; we only have observations generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt;. That’s because the data generating process would change from &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; to &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; only after we set &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt;. We need to make predictions on one distribution based on a different distribution. This is very much unlike classic ML where our training sample and outcome variable are both generated by the same distribution.&lt;/p&gt;
+&lt;p&gt;A further complication that arises from this situation is that we never have ground truth to test our models against. Utilizing ground truth to let models “learn” on their own by trial and error is the corner stone of ML (e.g. using gradient descent to find model parameters).&lt;/p&gt;
+&lt;p&gt;In ML we can always benchmark how accurate our model &lt;span class=&#34;math inline&#34;&gt;\(f(x,z)\)&lt;/span&gt; is by fitting it to a train sample and measuring &lt;span class=&#34;math inline&#34;&gt;\(L(Y,f(X,Z))\)&lt;/span&gt; in the test set (where &lt;span class=&#34;math inline&#34;&gt;\(L\)&lt;/span&gt; is some loss function representing how far off our model predictions are from the ground truth). We can also benchmark our model to competing models &lt;span class=&#34;math inline&#34;&gt;\(f&amp;#39;(x,z)\)&lt;/span&gt; without requiring any knowledge about how those models were derived or how their internal machinery works as long as we can compute &lt;span class=&#34;math inline&#34;&gt;\(f&amp;#39;(x,z)\)&lt;/span&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;theres-still-hope&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;There’s still hope&lt;/h1&gt;
+&lt;p&gt;While we don’t have observations generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; there are still instances where we can un-biasedly estimate &lt;span class=&#34;math inline&#34;&gt;\(\mathbb{E}(Y|do(X=x))\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;One of those instances happens when we are able to measure a set of variables &lt;span class=&#34;math inline&#34;&gt;\(Z_B \subset Z\)&lt;/span&gt; that satisfies the “backdoor criteria” (also called “adjustment set”). Roughly this is the set of features that keeps all directed paths between our feature of interest &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; and the outcome variable &lt;span class=&#34;math inline&#34;&gt;\(Y\)&lt;/span&gt; open while blocking any “spurious” paths (See my &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt; for more details on that).&lt;/p&gt;
+&lt;p&gt;In the case where we can measure &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt; the following equality holds:&lt;/p&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation} 
+\mathbb{E}(Y|do(X=x)) = \mathbb{E}_{Z_B}(f(x,Z_B))
+\end{equation}\]&lt;/span&gt;
+&lt;p&gt;where the right hand side can be estimated from samples &lt;span class=&#34;math inline&#34;&gt;\(\{y_i,x_i,{z_{B}}_i\}\)&lt;/span&gt; generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; using:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math inline&#34;&gt;\(\qquad \hat{\mathbb{E}}_{Z_B}(f(x,Z_B)) = \frac{1}{n}\sum_{i=1}^{n} f(x,z_{B_i})\)&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Very much like the &lt;span class=&#34;math inline&#34;&gt;\(PD\)&lt;/span&gt; function introduced earlier.&lt;/p&gt;
+&lt;p&gt;In fact we’re back in the good ole’ ML scenario where we can use that shiny new XGBoost implementation and enjoy all the benefits of having ground truth mentioned above as long as we restrict ourselves to using the feature subset &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;all-good-not-quite&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;All good? not quite&lt;/h1&gt;
+&lt;p&gt;While using the adjustment set &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt; let’s us use all the mighty good tools we have from ML, it entirely hinges on us constructing the correct data DAG (if you’re not sure what that is, see my &lt;a href=&#34;https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt;). Unfortunately that’s not easy to do nor validate.&lt;/p&gt;
+&lt;p&gt;In future posts I’ll touch upon how to find the correct DAG as well as other complications that usually arise when trying to find causal relations.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;further-reading&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Further reading&lt;/h1&gt;
+&lt;p&gt;If you’re after some more light read on the connections between classic ML and Causal inference see the Technical Report by Pearl: &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/The%20Seven%20Pillars%20of%20Causal%20Reasoning%20with%20Reflections%20on%20Machine%20Learning%20Pearl%202018.pdf&#34;&gt;The Seven Tools of Causal Inference with Reflections on Machine Learning&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;For a proof of quation 5 read chapter 3 of Pearls’ light intro to causal inference &lt;a href=&#34;http://bayes.cs.ucla.edu/PRIMER/&#34;&gt;Causal Inference in Statistics - A Primer&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;You can find the script producing this report &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/blog/2019-03-13-x-affects-y-what-does-that-even-mean.Rmd&#34;&gt;here&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I’d like to thank Sonia Vilenski-Lin, Yair Stark, Aviv Peled and Rithvik Mundra for providing feedback on this post drafts.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>&#34;Correlation does not imply causation&#34;. So what does?</title>
@@ -20,15 +563,24 @@
       <description>
 
 
-&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
-&lt;h1&gt;Intro&lt;/h1&gt;
 &lt;p&gt;Machine learning applications have been growing in volume and scope rapidly over the last few years. What’s Causal inference, how is it different than plain good ole’ ML and when should you consider using it? In this report I try giving a short and concrete answer by using an example.&lt;/p&gt;
-&lt;/div&gt;
 &lt;div id=&#34;a-typical-data-science-task&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;A typical data science task&lt;/h1&gt;
 &lt;p&gt;Imagine we’re tasked by the marketing team to find the effect of raising marketing spend on sales. We have at our disposal records of marketing spend (mkt), visits to our website (visits), sales, and competition index (comp).&lt;/p&gt;
 &lt;p&gt;We’ll simulate a dataset using a set of equations (also called structural equations):&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[sales = \beta_1vists + \beta_2comp + \epsilon_1\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[vists = \beta_3mkt + \epsilon_2\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[mkt = \beta_4comp + \epsilon_3\]&lt;/span&gt; &lt;span class=&#34;math display&#34;&gt;\[comp = \epsilon_4\]&lt;/span&gt; with &lt;span class=&#34;math inline&#34;&gt;\(\{\beta_1, \beta_2, \beta_3\, \beta_4\} = \{0.3, -0.9, 0.5, 0.6\}\)&lt;/span&gt;&lt;/p&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+sales = \beta_1vists + \beta_2comp + \epsilon_1
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+vists = \beta_3mkt + \epsilon_2
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+mkt = \beta_4comp + \epsilon_3
+\end{equation}\]&lt;/span&gt;
+&lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
+comp = \epsilon_4
+\end{equation}\]&lt;/span&gt;
+&lt;p&gt;with &lt;span class=&#34;math inline&#34;&gt;\(\{\beta_1, \beta_2, \beta_3\, \beta_4\} = \{0.3, -0.9, 0.5, 0.6\}\)&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;All data presented in graphs or used to fit models below is simulated from the above equations.&lt;/p&gt;
 &lt;p&gt;Below are the first few rows of the dataset:&lt;/p&gt;
 &lt;table style=&#34;width:46%;&#34;&gt;

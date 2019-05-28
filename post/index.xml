@@ -446,7 +446,7 @@
 &lt;div id=&#34;final-conclusion&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Final conclusion&lt;/h1&gt;
 &lt;p&gt;It would seem BART based algorithms are best suited for CI tasks among the competing algorithms. This is not entirely unexpected as it was &lt;a href=&#34;https://doi.org/10.1198/jcgs.2010.08162&#34;&gt;reported&lt;/a&gt; in the past that BART does well for CI tasks. It’s also worth mentioning that the author of the package implementing BARTC is a member of the group that put together the dataset we used in this simulation study.&lt;/p&gt;
-&lt;p&gt;Think you know an algorithm that can pinpoint the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; even in the hard case? You can write them in the comments below, or feel free to use the &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/blog/causal-inference-bake-off-kaggle-style.Rmd&#34;&gt;code&lt;/a&gt; that produced this post to add them to the competition.&lt;/p&gt;
+&lt;p&gt;Think you know an algorithm that can pinpoint the &lt;span class=&#34;math inline&#34;&gt;\(CATE\)&lt;/span&gt; even in the hard case? You can write them in the comments below, or feel free to use the &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/post/causal-inference-bake-off-kaggle-style.Rmd&#34;&gt;code&lt;/a&gt; that produced this post to add them to the competition.&lt;/p&gt;
 &lt;/div&gt;
 </description>
     </item>
@@ -547,7 +547,7 @@ comp = \epsilon_4
 &lt;h1&gt;Further reading&lt;/h1&gt;
 &lt;p&gt;If you’re after some more light read on the connections between classic ML and Causal inference see the Technical Report by Pearl: &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/The%20Seven%20Pillars%20of%20Causal%20Reasoning%20with%20Reflections%20on%20Machine%20Learning%20Pearl%202018.pdf&#34;&gt;The Seven Tools of Causal Inference with Reflections on Machine Learning&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;For a proof of equation 5 read chapter 3 of Pearls’ light intro to causal inference &lt;a href=&#34;http://bayes.cs.ucla.edu/PRIMER/&#34;&gt;Causal Inference in Statistics - A Primer&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;You can find the script producing this report &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/blog/2019-03-13-x-affects-y-what-does-that-even-mean.Rmd&#34;&gt;here&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can find the script producing this report &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/content/post/2019-03-13-x-affects-y-what-does-that-even-mean.Rmd&#34;&gt;here&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;I’d like to thank Sonia Vilenski-Lin, Yair Stark, Aviv Peled and Rithvik Mundra for providing feedback on this post drafts.&lt;/p&gt;
 &lt;/div&gt;
 </description>

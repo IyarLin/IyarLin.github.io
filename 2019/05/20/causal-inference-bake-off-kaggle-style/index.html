@@ -10,7 +10,7 @@
 <meta property="og:title" content="Causal inference bake off (Kaggle style!) - Just be-cause">
 
 
-  <link href='/images/stats.png' rel='icon' type='image/x-icon'/>
+  <link href='/images/logo.png' rel='icon' type='image/x-icon'/>
 
 
 
@@ -68,9 +68,13 @@
       
 
 
+<div class="figure">
+<img src="/post/causal-inference-bake-off-kaggle-style_files/target.jpg" width="600" height="300" />
+
+</div>
 <div id="intro" class="section level1">
 <h1>Intro</h1>
-<p>On my last <a href="https://iyarlin.github.io/blog/correlation-is-not-causation-so-what-is/">few</a> <a href="https://iyarlin.github.io/blog/x-affects-y-what-does-that-even-mean/">posts</a> I’ve tried answering high level questions such as “What is Causal inference?”, “How is it different than ML?” and “When should I use it?”.</p>
+<p>On my last <a href="https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/">few</a> <a href="https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/">posts</a> I’ve tried answering high level questions such as “What is Causal inference?”, “How is it different than ML?” and “When should I use it?”.</p>
 <p>In this post we finally get our hands dirty with some Kaggle style Causal Inference algorithms bake off! In this competition I’ll pit some well known ML algorithms vs a few specialized Causal Inference (CI) algorithms and find out who’s hot and who’s not!</p>
 </div>
 <div id="causal-inference-objectives-and-the-need-for-specialized-algorithms" class="section level1">
@@ -78,15 +82,13 @@
 <div id="ate-average-treatment-effect" class="section level2">
 <h2>ATE: Average Treatment Effect</h2>
 <p>So far we’ve learned that in order to estimate the causal dependence of <span class="math inline">\(Y\)</span> on <span class="math inline">\(X\)</span> we need to use a set of features <span class="math inline">\(Z_B\)</span> that satisfies the “Backdoor criteria”. We can then use the g-computation formula:</p>
-<span class="math display">\[\begin{align}
-\mathbb{E}(Y|do(x)) = \sum_{z_B}f(x,z_B)P(z_B)
-\end{align}\]</span>
-<p>where <span class="math inline">\(Y\)</span> is our target variable, <span class="math inline">\(do(x)\)</span> is the action of <strong>setting</strong> a treatment <span class="math inline">\(X\)</span> to a value <span class="math inline">\(x\)</span> (see my <a href="https://iyarlin.github.io/blog/x-affects-y-what-does-that-even-mean/">previuos post</a> for more details on the do operator) and <span class="math inline">\(f(x,z_B) = \hat{\mathbb{E}}(Y|x,z_B)\)</span> is some predictor function we can obtain using regular ML algorithms.</p>
+<p><span class="math display">\[\mathbb{E}(Y|do(x)) = \sum_{z_B}f(x,z_B)P(z_B)\]</span></p>
+<p>where <span class="math inline">\(Y\)</span> is our target variable, <span class="math inline">\(do(x)\)</span> is the action of <strong>setting</strong> a treatment <span class="math inline">\(X\)</span> to a value <span class="math inline">\(x\)</span> (see my <a href="https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/">previuos post</a> for more details on the do operator) and <span class="math inline">\(f(x,z_B) = \hat{\mathbb{E}}(Y|x,z_B)\)</span> is some predictor function we can obtain using regular ML algorithms.</p>
 <p>One might ask: if we can obtain <span class="math inline">\(f(x,z_B)\)</span> using regular ML algorithms why the need for specialized CI algorithms?</p>
 <p>The answer is that our objective in CI is different than our objective in classic ML: In ML we seek to predict the absolute value of Y given we observed <span class="math inline">\(X\)</span> take value <span class="math inline">\(x\)</span>: <span class="math inline">\(\mathbb{E}(Y|x)\)</span>, while in CI we try to estimate the difference in the expected value of <span class="math inline">\(Y\)</span> across different assignment values <span class="math inline">\(x\)</span> of <span class="math inline">\(X\)</span>. In the CI literature this quantity is termed “Average Treatment Effect” or in short <span class="math inline">\(ATE\)</span>. In the binary treatment case (where <span class="math inline">\(X \in \{0, 1\}\)</span>) it’s defined as:</p>
-<p><span class="math inline">\(\hspace{3em} ATE := \mathbb{E}(Y|do(1)) -\mathbb{E}(Y|do(0))\)</span></p>
+<p><span class="math display">\[ATE := \mathbb{E}(Y|do(1)) -\mathbb{E}(Y|do(0))\]</span></p>
 <p>and in the general (not necessarily binary treatment) case it’s defined as:</p>
-<p><span class="math inline">\(\hspace{4em} ATE(x) := \frac{\partial \, \mathbb{E}(Y|do(x))}{\partial \, x}\)</span></p>
+<p><span class="math display">\[ATE(x) := \frac{\partial \, \mathbb{E}(Y|do(x))}{\partial \, x}\]</span></p>
 <p>To see why accurate estimation of <span class="math inline">\(\mathbb{E}(Y|x)\)</span> doesn’t necessarily mean accurate estimation of the <span class="math inline">\(ATE\)</span> (and thus different objectives might require different algorithms) let’s look at an example:</p>
 <p>Imagine we work for a company in the marketing industry. The treatment in this example is an automatic AI bidding robot we’ve developed recently as a value added service for our campaigns management platform. In order to demonstrate it works we sold it in a trial version for a few months, at the end of which we recorded for all our customers whether they took the trial (“treated”) or not (“untreated”), average campaign ROI and company size (“small” or “large”):</p>
 <table style="width:62%;">
@@ -131,20 +133,22 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>The first line reads “The average ROI for campaigns run by small companies who didn’t use our robot (untreated) is 1%. The proportion of those campaigns of the entire campaigns run on our platform is 0.1.</p>
-<p>In order to use the g-computation formula (equation 1 above) we need to identify the correct adjustment set <span class="math inline">\(Z_B\)</span>.</p>
+<p>In order to use the g-computation formula we need to identify the correct adjustment set <span class="math inline">\(Z_B\)</span>.</p>
 <p>After talking to some of our customers we learn that large companies usually employ large teams of analysts to optimize their campaigns, resulting in higher ROI compared with smaller companies. Having those large teams also means they have lower tendency to run our trial compared with small companies.</p>
 <p>We thus assume the following DAG:</p>
 <p><img src="/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20dag-1.png" width="672" /></p>
-<p>Applying the “Backdoor criteria” to the DAG above we arrive at the insight that company size is a confounding factor and thus <span class="math inline">\(Z_B = \text{company size}\)</span>. Equation 1 above reads in our case:</p>
-<p><span class="math inline">\(\mathbb{E}(\text{ROI}|do(\text{treatment})) = \sum_{\text{company size} \in \{\text{small,  large}\}}\mathbb{E}(\text{ROI}|\text{treatment, company size})P(\text{company size})\)</span></p>
+<p>Applying the “Backdoor criteria” to the DAG above we arrive at the insight that company size is a confounding factor and thus <span class="math inline">\(Z_B = \text{company size}\)</span>. The g-computation formula reads in our case:</p>
+<span class="math display">\[\begin{equation}
+\mathbb{E}(\text{ROI}|do(\text{treatment})) = \\ 
+\sum_{\text{company size} \in \{\text{small,  large}\}}\mathbb{E}(\text{ROI}|\text{treatment, company size})P(\text{company size})
+\end{equation}\]</span>
 <p>We thus arrive at the quantities:</p>
-<p><span class="math inline">\(\mathbb{E}(\text{ROI}|do(\text{treated})) = 2\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3.5\%\)</span></p>
+<p><span class="math display">\[\mathbb{E}(\text{ROI}|do(\text{treated})) = \\ 2\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3.5\%\]</span></p>
 <p>and</p>
-<p><span class="math inline">\(\mathbb{E}(\text{ROI}|do(\text{untreated})) = 1\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3\%\)</span></p>
+<p><span class="math display">\[\mathbb{E}(\text{ROI}|do(\text{untreated})) = \\ 1\% \cdot (0.4 + 0.1) + 5\% \cdot (0.1 + 0.4) = 3\%\]</span></p>
 <p>and finally</p>
-<p><span class="math inline">\(\hspace{3em} ATE = \mathbb{E}(\text{ROI}|do(\text{treated})) - \mathbb{E}(\text{ROI}|do(\text{untreated})) = 0.5\%\)</span></p>
+<p><span class="math display">\[ATE = \mathbb{E}(\text{ROI}|do(\text{treated})) - \mathbb{E}(\text{ROI}|do(\text{untreated})) = 0.5\%\]</span></p>
 <p>Meaning the treatment (our robot) <strong>increases</strong> ROI by 0.5% on average.</p>
 <p>Next, let’s assume our data is noisy and the average ROI isn’t enough to estimate the expected ROI. We try to estimate the ROI using 2 models. Below we can see the model predictions (with absolute error in parenthesis):</p>
 <table>
@@ -201,30 +205,29 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>We can see that model 1 is more accurate than model 2 in every row.</p>
 <p>If we were to use model 1 to estimate the <span class="math inline">\(ATE\)</span> we’d get:</p>
-<p><span class="math inline">\(\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{mode1}} = 1.5\% \cdot (0.4 + 0.1) + 4.5\% \cdot (0.1 + 0.4) = 3\%\)</span></p>
+<p><span class="math display">\[\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{mode1}} = \\ 1.5\% \cdot (0.4 + 0.1) + 4.5\% \cdot (0.1 + 0.4) = 3\%\]</span></p>
 <p>and</p>
-<p><span class="math inline">\(\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{mode1}} = 1.5\% \cdot (0.4 + 0.1) + 5.5\% \cdot (0.1 + 0.4) = 3.5\%\)</span></p>
+<p><span class="math display">\[\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{mode1}} = \\ 1.5\% \cdot (0.4 + 0.1) + 5.5\% \cdot (0.1 + 0.4) = 3.5\%\]</span></p>
 <p>and finally</p>
-<p><span class="math inline">\(\hspace{4em} \hat{ATE}_{\text{mode1}} = -0.5\%\)</span></p>
+<p><span class="math display">\[\hat{ATE}_{\text{mode1}} = -0.5\%\]</span></p>
 <p>Meaning we estimate our product to <strong>decreases</strong> ROI by 0.5%! Our estimate is not only wrong in magnitude but also in sign, meaning we can’t use it to market our product.</p>
 <p>If we were to use model 2 however we’d get:</p>
-<p><span class="math inline">\(\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{model2}} = 1\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2.5\%\)</span></p>
+<p><span class="math display">\[\hat{\mathbb{E}}(\text{ROI}|do(\text{treated}))_{\text{model2}} = \\ 1\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2.5\%\]</span></p>
 <p>and</p>
-<p><span class="math inline">\(\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{model2}} = 0\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2\%\)</span></p>
+<p><span class="math display">\[\hat{\mathbb{E}}(\text{ROI}|do(\text{untreated}))_{\text{model2}} = \\ 0\% \cdot (0.4 + 0.1) + 4\% \cdot (0.1 + 0.4) = 2\%\]</span></p>
 <p>and finally</p>
-<p><span class="math inline">\(\hspace{4em} \hat{ATE}_{\text{model2}} = 0.5\%\)</span></p>
+<p><span class="math display">\[\hat{ATE}_{\text{model2}} = 0.5\%\]</span></p>
 <p>Arriving at the correct <span class="math inline">\(ATE\)</span> estimate! So even though model 2 is less accurate than model 1 in estimating <span class="math inline">\(\mathbb{E}(\text{ROI})\)</span>, it’s better in estimating the <span class="math inline">\(ATE\)</span>.</p>
 </div>
 <div id="cate-conditional-average-treatment-effect" class="section level2">
 <h2>CATE: Conditional Average Treatment Effect</h2>
 <p>Looking at the table above we see that while our product increases ROI by 0.5% <strong>on average</strong>, it increases ROI by 1% for campaigns run by small companies, while not improving at all those run by large ones. We’ll be thus well advised to market our product to small companies.</p>
 <p>In the CI literature the treatment effect conditioned on some other features <span class="math inline">\(z\)</span> (such as company size) is fittingly termed “Conditional Average Treatment Effect” (<span class="math inline">\(CATE\)</span>). In cases where the features conditioned on identify individuals uniquely (e.g. when at least one of the features conditioned on is continuous) it is also termed “Individual Treatment Effect”, which is a highly sought after quantity in personalized medicine for example. For the binary case the <span class="math inline">\(CATE\)</span> is defined as:</p>
-<p><span class="math inline">\(\quad CATE(z) := \mathbb{E}(Y|do(1),z) - \mathbb{E}(Y|do(0),z)\)</span></p>
+<p><span class="math display">\[CATE(z) := \mathbb{E}(Y|do(1),z) - \mathbb{E}(Y|do(0),z)\]</span></p>
 <p>In the general (not necessarily binary treatment) case it’s defined as:</p>
-<p><span class="math inline">\(\hspace{3em} CATE(x, z) := \frac{\partial \, \mathbb{E}(Y|do(X=x), Z=z)}{\partial \, x}\)</span></p>
+<p><span class="math display">\[CATE(x, z) := \frac{\partial \, \mathbb{E}(Y|do(X=x), Z=z)}{\partial \, x}\]</span></p>
 <p>Looking again at the model predictions above we can compare the actual vs predicted <span class="math inline">\(CATE\)</span> for both models (with absolute error in parentheses):</p>
 <table>
 <colgroup>
@@ -256,7 +259,6 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>Again, we can see that while model 1 was more accurate than model 2 in predicting <span class="math inline">\(\mathbb{E}(Y)\)</span>, it entirely misses the true <span class="math inline">\(CATE\)</span> while model 2 estimates it perfectly.</p>
 <p>To summarize: Specialized CI algorithms might be necessary because different objectives might require different tools.</p>
 </div>
@@ -347,14 +349,13 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>Full details about the data generation process can be found <a href="https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/Atlantic%20Causal%20Inference%20Conference%20Data%20Analysis%20Challenge%202017.pdf">here</a>.</p>
 <p>From every <span class="math inline">\(DGP\)</span> I simulate <span class="math inline">\(M =\)</span> 20 datasets and measure an algorithm <span class="math inline">\(\: f\)</span> performance using 2 measurements:</p>
 <p>The the first measurement looks at how well the <span class="math inline">\(ATE\)</span> is estimated across all <span class="math inline">\(M =\)</span> 20 simulations:</p>
-<p><span class="math inline">\(\quad RMSE_{ATE} = \sqrt{\sum_{m=1}^{M}\left(ATE - \hat{ATE}(m)\right)^2}\)</span></p>
+<p><span class="math display">\[RMSE_{ATE} = \sqrt{\sum_{m=1}^{M}\left(ATE - \hat{ATE}(m)\right)^2}\]</span></p>
 <p>We measure <span class="math inline">\(RMSE_{ATE}\)</span> once across all 20 simulations.</p>
 <p>The second is a type of “explained variability” or R-squared for <span class="math inline">\(CATE\)</span>:</p>
-<p><span class="math inline">\(\hspace{3em} R^{2}_{CATE} = 1 - \frac{var(CATE(z) - \hat{CATE}(z))}{var(CATE(z))}\)</span></p>
+<p><span class="math display">\[R^{2}_{CATE} = 1 - \frac{var(CATE(z) - \hat{CATE}(z))}{var(CATE(z))}\]</span></p>
 <p>We measure <span class="math inline">\(R^{2}_{CATE}\)</span> once for every simulation <span class="math inline">\(m\)</span>.</p>
 <div id="wait-why-use-a-synthetic-dataset-instead-of-a-real-one-like-in-ml" class="section level2">
 <h2>Wait, why use a synthetic dataset instead of a real one like in ML?</h2>
@@ -432,7 +433,6 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>Next thing we can notice is that for the easy case all algorithms nail the <span class="math inline">\(ATE\)</span> with the exception of RF while for the harder cases they all undershoot by a wide margin with the exception of BARTC which comes pretty close.</p>
 </div>
 <div id="cate" class="section level2">
@@ -488,7 +488,6 @@
 </tr>
 </tbody>
 </table>
-<p><br/></p>
 <p>We can see that the causal inference oriented algorithms all fair better than the regular ML ones. We can further see that BART and BARTC do best, yet all struggle in the hard case.</p>
 </div>
 </div>

@@ -38,7 +38,7 @@ Analyzing the effect of X on Y The field of Causal inference deals with the ques
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
       <guid>/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
-      <description>Machine learning applications have been growing in volume and scope rapidly over the last few years. What’s Causal inference, how is it different than plain good ole’ ML and when should you consider using it? In this report I try giving a short and concrete answer by using an example.
+      <description>Machine learning applications have been growing in volume and scope rapidly over the last few years. What’s Causal inference, how is it different than plain good ole’ ML and when should you consider using it? In this post I try giving a short and concrete answer by using an example.
 A typical data science task Imagine we’re tasked by the marketing team to find the effect of raising marketing spend on sales.</description>
     </item>
     
@@ -48,8 +48,9 @@ A typical data science task Imagine we’re tasked by the marketing team to find
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
       <guid>/about/</guid>
-      <description>I belive the best way to learn data-science is by doing. In this blog I share my learning experiences in the topics of Causal-Inference and general ML through simulation studies and hands on experimentation.
-Posts in this blog are graciously hosted also on the R-bloggers blog.
+      <description>I believe a good way to learn data-science is by doing, and the best way to learn is by explaining.
+In this blog I share my hands-on experimentation and simulation studies on the topics of Causal-Inference and ML in general.
+Posts in this blog are also graciously hosted on R-bloggers. The site favicon is made by Freepik
 This blog structure and layout are based on the &amp;ldquo;hello world&amp;rdquo; example website for the blogdown package.</description>
     </item>
     

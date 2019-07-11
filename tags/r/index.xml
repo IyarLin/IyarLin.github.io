@@ -6,10 +6,21 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 20 May 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 11 Jul 2019 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="/tags/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>My 2 cents on the &#34;R vs Python&#34; squabble</title>
+      <link>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</link>
+      <pubDate>Thu, 11 Jul 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</guid>
+      <description>Intro In this post I’ll make an exception and instead of sharing my research I’ll chime in on the never ending “R vs Python” squabble.
+The tl;dr version is:
+R is superior to Python for doing data science If you’re a newcomer to data science you should probably learn Python.  OK, so “what is data science” is probably the title of even more posts than “R vs Python”.</description>
+    </item>
     
     <item>
       <title>Causal inference bake off (Kaggle style!)</title>

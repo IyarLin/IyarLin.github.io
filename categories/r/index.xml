@@ -6,10 +6,54 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 20 May 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 11 Jul 2019 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>My 2 cents on the &#34;R vs Python&#34; squabble</title>
+      <link>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</link>
+      <pubDate>Thu, 11 Jul 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</guid>
+      <description>
+
+
+&lt;div class=&#34;figure&#34;&gt;
+&lt;img src=&#34;/post/my_2_cents_on_the_R_vs_Python_squabble_files/SaboriAv_Web.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;
+
+&lt;/div&gt;
+&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Intro&lt;/h1&gt;
+&lt;p&gt;In this post I’ll make an exception and instead of sharing my research I’ll chime in on the never ending “R vs Python” squabble.&lt;/p&gt;
+&lt;p&gt;The tl;dr version is:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;R is superior to Python for doing data science&lt;/li&gt;
+&lt;li&gt;If you’re a newcomer to data science you should probably learn Python.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;OK, so “what is data science” is probably the title of even more posts than “R vs Python”. I’m going to circumvent that discussion by clarifying that throughout this post when I talk about data science I refer to generating value from data using machine learning, statistics and visualizations. Stuff like database setup and maintenance fall within the scope of data engineering, and things like web scraping for example are more akin to software development in my mind. Even image processing is considered by some non data science and many of the practitioners on that field go by the name “Algorithmicists”.&lt;/p&gt;
+&lt;p&gt;I find R to be superior to Python for almost all data science tasks for 2 reasons:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Rstudio IDE&lt;/li&gt;
+&lt;li&gt;tidyverse&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Unlike software development, data science processes usually involve fast and iterative phases of data exploration and transformation, hypothesis testing, model development etc. At each phase we have new ideas floating around which we’d like to explore and research as fast as possible in order to get to the next phase.&lt;/p&gt;
+&lt;p&gt;In between our brain and his ideas and the data sits the IDE. The better an IDE is, the more work we can do in a given time frame, resulting in faster and more effective cycles as more brain resources are devoted to tackling the problem at hand rather trying to memorize what variables are currently in the working environment.&lt;/p&gt;
+&lt;p&gt;Rstudio IDE bundles tons of features which may exist separately on several different IDEs for python, but never are they all bundled in the same IDE. For example the latest shout on the street is Jupyter notebooks. While they are useful when one wants to organize plots and code on the same document, they miss almost any other feature required in a decent IDE such as a console for interactive coding or a variable explorer. Spider/pyCharm include variable explorer, a console and a debugger but miss the utility of the Jupyter notebooks.&lt;/p&gt;
+&lt;p&gt;Ratudios’ Rmarkdown files are like Jupyter notebooks on steroids that also include a console, variable explorer and many other useful features. All of these packed together make for a hugely productive working environment.&lt;/p&gt;
+&lt;p&gt;The second huge boost to R is the tidyverse package collection. These cover almost all day to day data science tasks using a cohesive “philosophy” which means they do not only play together very nicely, but also once you get a handle of one of them you are in a good position to conquer the rest.&lt;/p&gt;
+&lt;p&gt;One area where tidyverse shines especially is data munging - a set of tasks that many data scientists testify takes the majority of their time. Dplyr syntax is way more powerful, compact and readable than pandas which really looks like base R.&lt;/p&gt;
+&lt;p&gt;Sure, there are use cases where Python is superior to R. One example would be advanced Deep Learning applications (and I’m saying advanced because the R Keras integration is beautiful and allows completing most deep learning tasks). Other use cases might include projects where a high level of integration within a production system is required. But my personal impression is these make the vast minority in terms of actual data scientists working on them compared with what I defined as data science.&lt;/p&gt;
+&lt;p&gt;So why would I recommend aspiring data scientists to first master python? Simply because there’s more data scientists out there coding with Python (especially so in Israel) resulting in improved chances of lending successfully a first job in the industry.&lt;/p&gt;
+&lt;p&gt;Why is it that Python is more popular even though it’s less effective at doing data science? My guess is it has to do with the rising popularity and hype around the data science profession which has drawn large crowds from technically oriented fields such as CS. These obviously feel more at home coding with a general programming language rather than a data science focused one.&lt;/p&gt;
+&lt;p&gt;Another factor is that the cutting edge of data science in terms of technological development and salaries is Deep Learning, a field dominated by Python coders. So while most data scientists don’t actually utilize Deep Learning in their day to day jobs, many learn it in hopes of securing a position in that domain.&lt;/p&gt;
+&lt;p&gt;The context at which I’m writing this post is my wonder as an avid R user at the surge of data scientists around me that either start their career with Python or make the transition from R. The growing dominance of Python gave me plenty of reasons to contemplate joining the trend myself.&lt;/p&gt;
+&lt;p&gt;Given the above observations my decision is to stick with R whenever the project at hand allows it. Now granted, coding language should never make the difference when it comes to choosing a work place or projects. Python isn’t bad in itself (it’s just not as good as R) and mastering it shouldn’t be the challenging part of doing data science.&lt;/p&gt;
+&lt;p&gt;To the more seasoned data scientists in the crowd who work mainly on those areas I defined as data science throughout this post I’ll say: if you haven’t already, give R and Rstudio a spin - you might find it greatly boosts your productivity.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Causal inference bake off (Kaggle style!)</title>

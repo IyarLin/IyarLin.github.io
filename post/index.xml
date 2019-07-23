@@ -6,10 +6,482 @@
     <description>Recent content in Posts on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 11 Jul 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 23 Jul 2019 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>&#34;Real life&#34; DAG simulation using the simMixedDAG package</title>
+      <link>/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</link>
+      <pubDate>Tue, 23 Jul 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</guid>
+      <description>
+
+
+&lt;div class=&#34;figure&#34;&gt;
+&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/simMixedDAGhex.png&#34; width=&#34;380&#34; height=&#34;400&#34; /&gt;
+
+&lt;/div&gt;
+&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Intro&lt;/h1&gt;
+&lt;p&gt;I’ve discussed on several blog posts how Causal Inference involves making inference about unobserved quantities and distributions (e.g. we never observe &lt;span class=&#34;math inline&#34;&gt;\(Y|do(x)\)&lt;/span&gt;). That means we can’t benchmark different algorithms on Causal Inference tasks (e.g &lt;span class=&#34;math inline&#34;&gt;\(ATE/CATE\)&lt;/span&gt; estimation) the same way we do in ML because we don’t have any ground truth to benchmark against.&lt;/p&gt;
+&lt;p&gt;In the absence of ground truth, one of the main tools left for model comparison and performance bench-marking is simulation studies. On a &lt;a href=&#34;https://iyarlin.github.io/2019/05/20/causal-inference-bake-off-kaggle-style/&#34;&gt;recent post&lt;/a&gt; I used a &lt;a href=&#34;https://github.com/IyarLin/blog-code/blob/master/miscellaneous%20files/Atlantic%20Causal%20Inference%20Conference%20Data%20Analysis%20Challenge%202017.pdf&#34;&gt;semi synthetic dataset&lt;/a&gt; to benchmark different algorithms on the task of &lt;span class=&#34;math inline&#34;&gt;\(ATE/CATE\)&lt;/span&gt; estimation.&lt;/p&gt;
+&lt;p&gt;DAG estimation is another important task in Causal Inference on which I intend to write in a future post. The ground truth lacking in this case is the true DAG underlying a dataset. We thus need a way to simulate “realistic” datasets from known DAGs and compare how well different algorithms do at retrieving them.&lt;/p&gt;
+&lt;p&gt;When it comes to simulating data from DAGs there’s a slew of existing solutions in R. To name just a few:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;The &lt;code&gt;simulateSEM&lt;/code&gt; function from the “dagitty” package simulates continuous Gaussian variables only.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;dag.sim&lt;/code&gt; function from the “dagR” package simulates continuous Gaussian and logit binary nodes (no multi level categorical).&lt;/li&gt;
+&lt;li&gt;The &lt;code&gt;rbn&lt;/code&gt; function from the “bnlearn” package can simulate mixed data type datasets (both Gaussian continuous and categorical) but categorical nodes can only have categorical parents.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;All functions above generate datasets from parametric distributions, thus limiting how representative of “real” datasets the resulting simulations might be.&lt;/p&gt;
+&lt;p&gt;In an effort to enable better Causal Inference tasks bench-marking using “real life” datasets simulation I’ve written a small package: &lt;a href=&#34;https://github.com/IyarLin/simMixedDAG&#34;&gt;“simMixedDAG”&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;In this post I’ll introduce the package and demonstrate it’s features.&lt;/p&gt;
+&lt;p&gt;You can install the “simMixedDAG” package from github. I like doing so using the great “pacman” package:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;pacman::p_load_gh(&amp;quot;IyarLin/simMixedDAG&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;non-parametric-dag-simulation&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Non parametric DAG simulation&lt;/h1&gt;
+&lt;p&gt;When simulating data from a DAG, one has to specify for every node &lt;span class=&#34;math inline&#34;&gt;\(x_j\)&lt;/span&gt; some data generating process &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt; which defines how the node is simulated from it’s parent nodes &lt;span class=&#34;math inline&#34;&gt;\(PA_j\)&lt;/span&gt;. The DAG structure along with the functions &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt; compose what I refere to as a “DAG model”.&lt;/p&gt;
+&lt;p&gt;Trying to specify non-parametric &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt; can be pretty tedious (essentially drawing by hand the different marginal and joint distributions) and can also be not very realistic as not many of us have a good intuition as to how a “real life” non parametric distribution looks like.&lt;/p&gt;
+&lt;p&gt;What we can do instead is define the functions &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt; as &lt;a href=&#34;https://en.wikipedia.org/wiki/Generalized_additive_model&#34;&gt;generalized additive models&lt;/a&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[x_j = f_j(PA_j) = g\left(\sum_{i \in PA_j}s_{ij}(x_i) + \epsilon_j\right)\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;where &lt;span class=&#34;math inline&#34;&gt;\(g\)&lt;/span&gt; is a link function and &lt;span class=&#34;math inline&#34;&gt;\(s_{ij}(x_i)\)&lt;/span&gt; are smoothing functions.&lt;/p&gt;
+&lt;p&gt;Next, assuming some DAG we can fit the smoothing functions &lt;span class=&#34;math inline&#34;&gt;\(s_{ij}(x_i)\)&lt;/span&gt; from a real life dataset. The fitted functions can now be used to simulate new datasets. The resulting datasets have a known underlying DAG while maintaining marginal and joint distributions similar to those observed in a “real life” dataset.&lt;/p&gt;
+&lt;div id=&#34;fitting-and-simulating-a-non-paramateric-dag---an-example&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Fitting and simulating a non paramateric DAG - an example&lt;/h2&gt;
+&lt;p&gt;In this example we’ll use the &lt;a href=&#34;https://vincentarelbundock.github.io/Rdatasets/doc/carData/GSSvocab.html&#34;&gt;General Social Survey&lt;/a&gt; dataset.&lt;/p&gt;
+&lt;p&gt;We’ll assume the following DAG for a subset of the variables:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The following piece of code fits the smoothing functions &lt;span class=&#34;math inline&#34;&gt;\(s_{ij}(x_i)\)&lt;/span&gt; and stores them in an object of class “non_parametric_dag_model”:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;non_param_dag_model &amp;lt;-
+  non_parametric_dag_model(
+    dag = g,
+    data = GSSvocab
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Simulating new data from the &lt;code&gt;dag_model&lt;/code&gt; object is simple as running:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sim_data &amp;lt;-
+  sim_mixed_dag(
+    dag_model = non_param_dag_model,
+    N = 30000
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can verify that indeed the original distributions are mostly preserved in the simulated dataset:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We notice vocab on the original dataset was constrained to the integers 0-10, while in the simulated dataset it was transformed to continuous with some values extending beyond the 0-10 range.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;table style=&#34;width:43%;&#34;&gt;
+&lt;caption&gt;Original data&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;nativeBorn&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;female&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;male&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;no&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0469&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0387&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;yes&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.52&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.394&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;table style=&#34;width:43%;&#34;&gt;
+&lt;caption&gt;Simulated data&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;nativeBorn&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;female&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;male&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;no&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.0494&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.035&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;yes&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.52&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.395&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;paramteric-dag-simulation&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Paramteric DAG simulation&lt;/h1&gt;
+&lt;p&gt;The simMixedDAG provides functions for simulation of complex parametric DAG models as well. These can come handy when one wants to have more control over the specific functions &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt;. At it’s most basic form it can be used to simulate simple Gaussian nodes:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = lp + \epsilon_j\]&lt;/span&gt; where &lt;span class=&#34;math inline&#34;&gt;\(lp\)&lt;/span&gt; is the linear combination of the node parents: &lt;span class=&#34;math inline&#34;&gt;\(lp = \sum_{i \in PA_j}\beta_{ij}x_i\)&lt;/span&gt;.&lt;/p&gt;
+&lt;div id=&#34;specifying-and-simulating-a-paramateric-dag---an-example&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Specifying and simulating a paramateric DAG - an example&lt;/h2&gt;
+&lt;p&gt;In this example we’ll use the DAG presented on my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;first post&lt;/a&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/plot%20dag-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;In the next few lines I specify a simple parametric DAG model with all Gaussian nodes and simulate a dataset from that model:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(2)
+param_dag_model &amp;lt;- parametric_dag_model(dag = g)
+sim_data &amp;lt;- sim_mixed_dag(dag_model = param_dag_model, 
+                          N = 500)
+sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
+  stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;In the code above we didn’t specify what the &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; coefficients are. Those are thus drawn from a standard normal distribution.&lt;/p&gt;
+&lt;p&gt;We can manually set beta coefficients by providing an additional &lt;code&gt;f.args&lt;/code&gt; argument as follows:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
+param_dag_model &amp;lt;-
+  parametric_dag_model(
+    dag = g, f.args =
+      list(sales = list(betas = list(comp = -2)))
+  )
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model, N = 500)
+sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
+  stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can set how noisy the errors are using the &lt;code&gt;sinr&lt;/code&gt; (signal to noise ratio) argument:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
+param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, f.args = list(
+    sales = list(betas = list(comp = -2), sinr = 5),
+    mkt = list(betas = list(comp = 0))
+  ))
+
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+
+sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
+  stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can tweak the &lt;span class=&#34;math inline&#34;&gt;\(f\)&lt;/span&gt; functions to include a link function &lt;span class=&#34;math inline&#34;&gt;\(g\)&lt;/span&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = g(lp) + \epsilon_j\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Below I apply a “cosin” link function using the &lt;code&gt;link&lt;/code&gt; argument:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
+param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, f.args = list(
+    sales = list(betas = list(comp = -2), 
+                 link = &amp;quot;cosin&amp;quot;, 
+                 sinr = 3),
+    mkt = list(betas = list(comp = 0))
+  ))
+
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+
+sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
+  stat_smooth()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Below are 2 more link functions implemented:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
+param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, f.args = list(
+    sales = list(betas = list(comp = -2), 
+                 link = &amp;quot;quadratic&amp;quot;, 
+                 sinr = 3),
+    mkt = list(betas = list(comp = 0))
+  ))
+
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+
+p1 &amp;lt;- sim_data %&amp;gt;% ggplot(aes(comp, sales)) + 
+  geom_point() + stat_smooth() + 
+  ggtitle(&amp;quot;Quadratic&amp;quot;) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, f.args = list(
+    sales = list(betas = list(comp = -2), 
+                 link = &amp;quot;exp&amp;quot;, 
+                 sinr = 3),
+    mkt = list(betas = list(comp = 0))
+  ))
+
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+
+p2 &amp;lt;- sim_data %&amp;gt;% ggplot(aes(comp, sales)) + 
+  geom_point() + stat_smooth() + 
+  ggtitle(&amp;quot;Exponent&amp;quot;) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(p1, p2, nrow = 1)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We introduce categorical variables with &lt;span class=&#34;math inline&#34;&gt;\(M\)&lt;/span&gt; levels via the following transformation:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = cat(g(lp) + \epsilon_j)\]&lt;/span&gt; where we have:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[  
+cat(x) = 
+\begin{cases}
+\text{level 1,} &amp;amp;\quad\text{if} \, x \leq \Phi^{-1}(100/M) \\
+\text{level 2,} &amp;amp;\quad\text{if} \, x &amp;gt; \Phi^{-1}(100/M) \, , x/sd(x) \leq \Phi^{-1}(100\cdot 2/M)\\
+\dots &amp;amp; \dots \\
+\text{level M,} &amp;amp;\quad\text{if} \, x &amp;gt; \Phi^{-1}(100\cdot(M-1)/M) \\
+\end{cases}
+\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;We set the number of levels using the &lt;code&gt;levels&lt;/code&gt; argument (where levels = 1 means continuous variable):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, 
+      f.args = list(sales = list(
+    betas = list(comp = -2),
+    link = &amp;quot;quadratic&amp;quot;, sinr = 3, levels = 3,
+    labels = c(&amp;quot;low&amp;quot;, &amp;quot;medium&amp;quot;, &amp;quot;high&amp;quot;)
+  ), mkt = list(betas = list(comp = 0))))
+
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+
+sim_data %&amp;gt;% ggplot(aes(sales, comp)) + geom_boxplot() +
+  stat_smooth()&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It’s important to note that any non-specified arguments in &lt;code&gt;f.args&lt;/code&gt; are filled in from default values.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;calculating-ate-given-a-dag-model&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Calculating ATE given a DAG model&lt;/h1&gt;
+&lt;p&gt;The “simMixedDAG” package can be used for bench-marking algorithms on the task of &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; estimation.&lt;/p&gt;
+&lt;p&gt;For simple DAG models the analytic calculation of the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; is pretty simple (e.g. continuous Gaussian distributed, no interactions etc). When simulating from more complex models (e.g. parametric with link functions, non parametric models) deriving the ATE analytically might become more challenging.&lt;/p&gt;
+&lt;p&gt;One way to obtain the true &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; given a DAG model is to use simulation analysis. Consider for instance the problem setup discussed on my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;first post&lt;/a&gt; where we calculated analytically that the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; of mkt on sales was 0.15.&lt;/p&gt;
+&lt;p&gt;We know that the relation of &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; to &lt;span class=&#34;math inline&#34;&gt;\(sales\)&lt;/span&gt; is confounded by the &lt;span class=&#34;math inline&#34;&gt;\(comp\)&lt;/span&gt; variable. When setting &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; to some value (AKA &lt;span class=&#34;math inline&#34;&gt;\(do(mkt)\)&lt;/span&gt;) we remove the arrow that points from &lt;span class=&#34;math inline&#34;&gt;\(comp\)&lt;/span&gt; to &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; (like in the DAG below):&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The above operation of removing all arrows pointing into the treatment variable is also called “graph surgery” (See Pearl’s “Causal Inference in Statistics - A Primer” chapter 3).&lt;/p&gt;
+&lt;p&gt;When observing the by-variate relation in the non-confounded dataset simulated from the DAG above we can see the true effect of &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; on &lt;span class=&#34;math inline&#34;&gt;\(sales\)&lt;/span&gt;:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g_unconfounded, 
+                       f.args = list(
+    sales = list(betas = list(visits = 0.3, 
+                              comp = -0.9)),
+    visits = list(betas = list(mkt = 0.5))
+  )) # note here we set the comp to mkt 
+     # coefficient to 0
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
+sim_data %&amp;gt;% ggplot(aes(mkt, sales)) + geom_point() +
+  stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-17-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;get_ate&lt;/code&gt; function implements the same logic under the hood to calculate the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; for any &lt;code&gt;dag_model&lt;/code&gt;. Below we demonstrate using the following code:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;-
+  parametric_dag_model(dag = g, f.args = list(
+    sales = list(betas = list(visits = 0.3, 
+                              comp = -0.9)),
+    visits = list(betas = list(mkt = 0.5)),
+    mkt = list(betas = list(comp = 0.6))
+  )) # note the comp to mkt coefficient is as
+     # in the original probelm setup
+
+mkt_ATE_on_sales &amp;lt;- get_ate(param_dag_model,
+  treatment = &amp;quot;mkt&amp;quot;,
+  treatment_vals = -2:2, exposure = &amp;quot;sales&amp;quot;
+)
+pandoc.table(mkt_ATE_on_sales, 
+             caption = &amp;quot;mkt ATE on sales&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table style=&#34;width:28%;&#34;&gt;
+&lt;caption&gt;mkt ATE on sales&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;9%&#34; /&gt;
+&lt;col width=&#34;6%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;from&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;to&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ATE&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;-2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1514&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;-1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1482&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1502&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1512&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;We can verify that indeed we got the outcome derived analytically.&lt;/p&gt;
+&lt;p&gt;Now let’s take a more complicated model defined by the following equations:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[sales = quadratic\left(1.5 \cdot visits -4 \cdot  comp\right) + \epsilon_{sales}\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[visits = 0.5I(mkt = &amp;quot;medium&amp;quot;) + 1.2I(mkt = &amp;quot;high&amp;quot;) + \epsilon_{visits}\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[mkt = cat(exp(2 \cdot comp) + \epsilon_{mkt})\]&lt;/span&gt; with &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; taking the levels “low”, “medium” and “high”.&lt;/p&gt;
+&lt;p&gt;Below is the code to define the model defined by the equations above and get the corresponding ate of mkt on sales.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;- parametric_dag_model(dag = g, 
+                                        f.args = list(
+    sales = list(betas = list(visits = 1.5, comp = -4), 
+                 link = &amp;quot;quadratic&amp;quot;),
+    visits = list(betas = list(mkt = c(0.5, 1.2)), 
+                  levels = 1),
+    mkt = list(
+      betas = list(comp = 2), levels = 3, 
+      labels = c(&amp;quot;low&amp;quot;, &amp;quot;medium&amp;quot;, &amp;quot;high&amp;quot;),
+      link = &amp;quot;exp&amp;quot;, sinr = 8
+    )
+  ))
+
+treat_vals &amp;lt;- factor(c(&amp;quot;low&amp;quot;, &amp;quot;medium&amp;quot;, &amp;quot;high&amp;quot;), 
+                  levels = c(&amp;quot;low&amp;quot;, &amp;quot;medium&amp;quot;, &amp;quot;high&amp;quot;))
+mkt_ate_on_sales &amp;lt;- 
+  get_ate(param_dag_model, treatment = &amp;quot;mkt&amp;quot;, 
+          treatment_vals = treat_vals, 
+          exposure = &amp;quot;sales&amp;quot;)
+  
+pandoc.table(mkt_ate_on_sales, 
+             caption = &amp;quot;mkt ATE on sales&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table style=&#34;width:38%;&#34;&gt;
+&lt;caption&gt;mkt ATE on sales&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;from&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;to&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ATE&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;low&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;medium&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;5.139&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;medium&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;high&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;7.518&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Below we verify we got the correct result by simulating the unconfounded dataset and measuring the difference between average sales for by mkt:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model$f.args$mkt$betas$comp &amp;lt;- 0
+sim_data &amp;lt;- sim_mixed_dag(param_dag_model, N = 1000000)
+sim_data %&amp;gt;%
+  group_by(mkt) %&amp;gt;%
+  summarise(sales = mean(sales)) %&amp;gt;%
+  mutate(sales_diff = sales - lag(sales)) %&amp;gt;%
+  pandoc.table()&lt;/code&gt;&lt;/pre&gt;
+&lt;table style=&#34;width:40%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;mkt&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sales&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sales_diff&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;low&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.147&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;NA&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;medium&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.82&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;4.673&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;high&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.97&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;7.149&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Seems close enough.&lt;/p&gt;
+&lt;p&gt;Let’s go back to the non-parametric model we defined earlier and calculate the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; of educ on vocab:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;educ_ate_on_vocab &amp;lt;-
+  get_ate(non_param_dag_model,
+    treatment = &amp;quot;educ&amp;quot;,
+    exposure = &amp;quot;vocab&amp;quot;,
+    treatment_vals = c(0, 12, 15, 17, 20),
+    M = 300
+  ) %&amp;gt;% 
+  mutate(min_education = c(&amp;quot;high school&amp;quot;, 
+                           &amp;quot;1st degree&amp;quot;, 
+                           &amp;quot;2nd degree&amp;quot;, 
+                           &amp;quot;PhD&amp;quot;))
+pandoc.table(educ_ate_on_vocab, 
+             caption = &amp;quot;educ ATE on vocab&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;table style=&#34;width:50%;&#34;&gt;
+&lt;caption&gt;educ ATE on vocab&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;9%&#34; /&gt;
+&lt;col width=&#34;6%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;col width=&#34;20%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;from&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;to&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;ATE&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;min_education&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;12&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.228&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;high school&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;12&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;15&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.119&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1st degree&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;15&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;17&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.7399&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2nd degree&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;17&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;20&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5299&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;PhD&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;It would seem academic accomplishments have diminishing returns.&lt;/p&gt;
+&lt;div id=&#34;an-acknowledgement&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;An acknowledgement&lt;/h2&gt;
+&lt;p&gt;Kudos to Guangchuang YU for authoring the cool &lt;a href=&#34;https://github.com/GuangchuangYu/hexSticker&#34;&gt;hexSticker&lt;/a&gt; package, which makes creating hexagon sticker for your package (like the one at the top of this post) a breeze.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>My 2 cents on the &#34;R vs Python&#34; squabble</title>

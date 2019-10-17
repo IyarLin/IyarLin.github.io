@@ -6,10 +6,233 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 23 Jul 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 17 Oct 2019 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Automatic DAG learning - part 1</title>
+      <link>/2019/10/17/automatic_dag_learning_part_1/</link>
+      <pubDate>Thu, 17 Oct 2019 00:00:00 +0000</pubDate>
+      
+      <guid>/2019/10/17/automatic_dag_learning_part_1/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/Dag-score.jpg&#34; width=&#34;650&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;I was really struggling with finding a header pic for this post when I came across the one above - titled &lt;a href=&#34;https://www.google.com/search?q=dag&amp;amp;sxsrf=ACYBGNSbNuRo9RIXip-5aOAMO3qcPF0cmg:1571232790582&amp;amp;source=lnms&amp;amp;tbm=isch&amp;amp;sa=X&amp;amp;ved=0ahUKEwjb6d2i8qDlAhWKOcAKHSfGBiwQ_AUIEigB&amp;amp;biw=1680&amp;amp;bih=890&amp;amp;dpr=2#imgrc=g90lBqR0P6M8DM:&#34;&gt;“Dag scoring and selection”&lt;/a&gt; and since it’s sort of the topic of this post I decided to use it!&lt;/p&gt;
+&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Intro&lt;/h1&gt;
+&lt;p&gt;On my &lt;a href=&#34;https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/&#34;&gt;second&lt;/a&gt; post I’ve stressed how important it is to use the correct adjustment set when trying to estimate a causal relationship between some treatment and exposure variables. The key to using the correct adjustment set is correctly identifying the underling DAG generating a dataset.&lt;/p&gt;
+&lt;p&gt;A few approaches I can think of to obtain a DAG for causal inference would be:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Use domain knowledge and theory&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Pick one of a few candidate DAGs by comparing their fit to the data&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Use algorithms to automatically “learn” the underlying DAG&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;In this post I’ll explore the last approach. Being able to learn the underlying model DAG from a dataset “automatically” would enable non subject matter experts to do Causal Inference in a very similar fashion to classic ML.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;existing-methods-for-learning-dags&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Existing methods for learning DAGs&lt;/h1&gt;
+&lt;p&gt;R has tons of packages for DAG estimation. Fortunately, the &lt;a href=&#34;https://annehpetersen.shinyapps.io/causalDisco/&#34;&gt;causalDisco&lt;/a&gt; is a great shiny app that enables searching DAG estimation functions using different criteria.&lt;/p&gt;
+&lt;p&gt;In this post I’ll restrict the discussion to the scenario where there are no hidden confounders and where the dataset contains both discrete (i.e. categorical) and numeric variables. We’d also like our estimation function to output a DAG with all edges oriented. Below we can see the results of applying these conditions in the causalDisco app:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/Screen%20Shot%202019-10-17%20at%209.01.40.png&#34; width=&#34;600&#34; height=&#34;550&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We get the following list: &lt;em&gt;bnlearn::hc&lt;/em&gt;, &lt;em&gt;bnlearn::tabu&lt;/em&gt;, &lt;em&gt;bnlearn::mmhc&lt;/em&gt;, &lt;em&gt;bnlearn::rsmax2&lt;/em&gt;, &lt;em&gt;deal::autosearch&lt;/em&gt; and &lt;em&gt;deal::heuristic&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;After playing around a bit with the &lt;em&gt;deal&lt;/em&gt; functions I found they were too manual for a quick algorithm comparison. I’ve thus decided to use only the &lt;em&gt;bnlearn&lt;/em&gt; functions.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;estimated-dag-dissimilarity-measurements&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Estimated DAG dissimilarity measurements&lt;/h1&gt;
+&lt;p&gt;How can we measure how different our estimated DAG is from the true DAG?&lt;/p&gt;
+&lt;div id=&#34;edge-distance&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Edge distance&lt;/h2&gt;
+&lt;p&gt;A simple way to measure estimated DAG dissimilarity with the true DAG would be to count how many edges are present in the true DAG yet missing in the estimated DAG and conversely, how many edges are present in the estimated DAG yet do not exist in the true DAG.&lt;/p&gt;
+&lt;p&gt;Let’s take as an example the DAG presented on my &lt;a href=&#34;link&#34;&gt;last post&lt;/a&gt; (presented on the left), along with an estimated DAG (on the right):&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see in the above example that in the estimated DAG there’s an edge &lt;span class=&#34;math inline&#34;&gt;\(gender \rightarrow ageGroup\)&lt;/span&gt; which doesn’t exist in the true DAG, and that it’s missing the edge &lt;span class=&#34;math inline&#34;&gt;\(nativeBorn \rightarrow educ\)&lt;/span&gt;. So the edge distance this case is 2.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;hamming-distance&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Hamming distance&lt;/h2&gt;
+&lt;p&gt;Even if an edge exists in the 2 DAGs, it would make sense to penalize it if the edge orientation is wrong. The Hamming distance is the same as the edge distance, only it counts in addition edges oriented incorrectly. In the above example we can see that the edge &lt;span class=&#34;math inline&#34;&gt;\(educ \rightarrow gender\)&lt;/span&gt; is oriented incorrectly (the true orientation is &lt;span class=&#34;math inline&#34;&gt;\(educ \leftarrow gender\)&lt;/span&gt;) and thus the Hamming distance in this case would be 3.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;structural-intervention-distance&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Structural Intervention Distance&lt;/h2&gt;
+&lt;p&gt;The reason we construct DAGs to begin with is to enable correct adjustment set identification. It would thus make sense to measure DAG dissimilarity in light of that motivation.&lt;/p&gt;
+&lt;p&gt;To that end, the &lt;a href=&#34;https://arxiv.org/abs/1306.1043&#34;&gt;Structural Intervention Distance&lt;/a&gt; (SID) counts all possible treatment - exposure pairs where the estimated DAG does not yield a correct adjustment set.&lt;/p&gt;
+&lt;p&gt;To see the cases in the example above where the estimated adjustment sets are different than the true adjustment sets we can check the table below (we note an empty set {} means no conditioning is required to estimate the causal effect while “No adjustment sets” means there isn’t any set of variables we can adjust for to estimate the causal effect):&lt;/p&gt;
+&lt;table style=&#34;width:93%;&#34;&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;18%&#34; /&gt;
+&lt;col width=&#34;29%&#34; /&gt;
+&lt;col width=&#34;29%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;treatment&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;exposure&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;True set&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Estimated set&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;gender&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;educ&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;No adjustment sets&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;educ&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;gender&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;No adjustment sets&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;educ&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;nativeBorn&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;No adjustment sets&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;gender&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;nativeBorn&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;educ&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;vocab&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{nativeBorn}&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;gender&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;vocab&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{}&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;{educ}&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The SID in the example above would thus be 6.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;div id=&#34;dag-estimation-algorithms-benchmarking&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;DAG estimation algorithms benchmarking&lt;/h1&gt;
+&lt;p&gt;In this section we’ll use the &lt;a href=&#34;https://github.com/IyarLin/simMixedDAG&#34;&gt;simMixedDAG&lt;/a&gt; package to simulate datasets from a DAG and benchmark different algorithms on recovering it using the above measures.&lt;/p&gt;
+&lt;p&gt;The DAG and data generating process (DGP) in this section will be based on the &lt;a href=&#34;https://vincentarelbundock.github.io/Rdatasets/doc/carData/GSSvocab.html&#34;&gt;General Social Survey&lt;/a&gt; data.&lt;/p&gt;
+&lt;p&gt;The data structure is shown below:&lt;/p&gt;
+&lt;table&gt;
+&lt;caption&gt;27360 Observations&lt;/caption&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;29%&#34; /&gt;
+&lt;col width=&#34;41%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;variable&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;class&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;sample_values&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;missing&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;year&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;numeric&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Min. = 1978, 1st Qu. = 1988,
+Median = 1996, Mean = 1997.49,
+3rd Qu. = 2008, Max. = 2016&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;gender&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;factor with 2 levels&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;female, male&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;nativeBorn&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;factor with 2 levels&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;no, yes&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;ageGroup&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;factor with 5 levels&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;30-39, 18-29, 60+, 40-49,
+50-59&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;educGroup&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;factor with 5 levels&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;16 yrs, &amp;lt;12 yrs, 13-15 yrs, 12
+yrs, &amp;gt;16 yrs&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;vocab&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;numeric&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Min. = 0, 1st Qu. = 5, Median
+= 6, Mean = 6, 3rd Qu. = 7,
+Max. = 10&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;age&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;numeric&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Min. = 18, 1st Qu. = 31,
+Median = 43, Mean = 45.75, 3rd
+Qu. = 59, Max. = 89&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;educ&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;numeric&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;Min. = 0, 1st Qu. = 12, Median
+= 13, Mean = 13.16, 3rd Qu. =
+16, Max. = 20&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;We’ll assume throughout the example that the following is the true DAG:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The DGP will be constructed using the &lt;em&gt;non_parametric_dag_model&lt;/em&gt; function from &lt;em&gt;simMixedDAG&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;For every algorithm and sample size we simulate 200 datasets and measure the estimated DAG accuracy.&lt;/p&gt;
+&lt;p&gt;Below we can see the average simulation results for the edge distance measure for different samples sizes:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the algorithm performance is comparable up to around 27360 observations, after which &lt;em&gt;mmhc&lt;/em&gt; and &lt;em&gt;rsmax2&lt;/em&gt; flatten out while &lt;em&gt;hc&lt;/em&gt; and &lt;em&gt;tabu&lt;/em&gt; approach perfect estimation of the DAG skeleton.&lt;/p&gt;
+&lt;p&gt;Below we can see the average simulation results for the Hamming distance measure:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that pretty fast all algorithms hit a performance plateau at around 6.&lt;/p&gt;
+&lt;p&gt;When it comes to Structural Intervention Distance things look even worse:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Let’s revisit that last one with error bars just for mmhc:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the performance is essentially unchanged across different sample sizes (all confidence intervals overlap).&lt;/p&gt;
+&lt;p&gt;To get a sense of what different SID scores mean, we can calculate the probability of finding the correct adjustment set given a random selection of a treatment and control pair using the following equation:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[P(\text{correct adj set)} = 1 - \frac{SID}{\#\{\text{possible treatment - exposure pairs}\}}\]&lt;/span&gt;
+In our case given there are 8 nodes we have &lt;span class=&#34;math inline&#34;&gt;\(\#\{\text{possible treatment - exposure pairs}\} = 8 \cdot 7 = 56\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;Below is the resulting graph:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Pretty abysmal.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;summary&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Summary&lt;/h1&gt;
+&lt;p&gt;While all algorithms converge on the correct DAG skeleton as the sample size increases, none of them is able to orient the edges correctly. So at least for the algorithms surveyed, benchmarked on our specific simulated dataset it would seem automatic DAG learning isn’t a very reliable way to find the correct adjustment set.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;all-is-lost&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;All is lost?&lt;/h1&gt;
+&lt;p&gt;Despair not! For in my next blog post I’ll introduce a small package I’ve written to address the issue of DAG edge orientation.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>&#34;Real life&#34; DAG simulation using the simMixedDAG package</title>
@@ -20,10 +243,7 @@
       <description>
 
 
-&lt;div class=&#34;figure&#34;&gt;
-&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/simMixedDAGhex.png&#34; width=&#34;380&#34; height=&#34;400&#34; /&gt;
-
-&lt;/div&gt;
+&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/simMixedDAGhex.png&#34; width=&#34;380&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Intro&lt;/h1&gt;
 &lt;p&gt;I’ve discussed on several blog posts how Causal Inference involves making inference about unobserved quantities and distributions (e.g. we never observe &lt;span class=&#34;math inline&#34;&gt;\(Y|do(x)\)&lt;/span&gt;). That means we can’t benchmark different algorithms on Causal Inference tasks (e.g &lt;span class=&#34;math inline&#34;&gt;\(ATE/CATE\)&lt;/span&gt; estimation) the same way we do in ML because we don’t have any ground truth to benchmark against.&lt;/p&gt;
@@ -131,7 +351,8 @@
 &lt;div id=&#34;paramteric-dag-simulation&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Paramteric DAG simulation&lt;/h1&gt;
 &lt;p&gt;The simMixedDAG provides functions for simulation of complex parametric DAG models as well. These can come handy when one wants to have more control over the specific functions &lt;span class=&#34;math inline&#34;&gt;\(f_j\)&lt;/span&gt;. At it’s most basic form it can be used to simulate simple Gaussian nodes:&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = lp + \epsilon_j\]&lt;/span&gt; where &lt;span class=&#34;math inline&#34;&gt;\(lp\)&lt;/span&gt; is the linear combination of the node parents: &lt;span class=&#34;math inline&#34;&gt;\(lp = \sum_{i \in PA_j}\beta_{ij}x_i\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = lp + \epsilon_j\]&lt;/span&gt;
+where &lt;span class=&#34;math inline&#34;&gt;\(lp\)&lt;/span&gt; is the linear combination of the node parents: &lt;span class=&#34;math inline&#34;&gt;\(lp = \sum_{i \in PA_j}\beta_{ij}x_i\)&lt;/span&gt;.&lt;/p&gt;
 &lt;div id=&#34;specifying-and-simulating-a-paramateric-dag---an-example&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Specifying and simulating a paramateric DAG - an example&lt;/h2&gt;
 &lt;p&gt;In this example we’ll use the DAG presented on my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;first post&lt;/a&gt;:&lt;/p&gt;
@@ -221,7 +442,8 @@ p2 &amp;lt;- sim_data %&amp;gt;% ggplot(aes(comp, sales)) +
 grid.arrange(p1, p2, nrow = 1)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We introduce categorical variables with &lt;span class=&#34;math inline&#34;&gt;\(M\)&lt;/span&gt; levels via the following transformation:&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = cat(g(lp) + \epsilon_j)\]&lt;/span&gt; where we have:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = cat(g(lp) + \epsilon_j)\]&lt;/span&gt;
+where we have:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[  
 cat(x) = 
 \begin{cases}
@@ -285,12 +507,12 @@ mkt_ATE_on_sales &amp;lt;- get_ate(param_dag_model,
 )
 pandoc.table(mkt_ATE_on_sales, 
              caption = &amp;quot;mkt ATE on sales&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;table style=&#34;width:28%;&#34;&gt;
+&lt;table style=&#34;width:29%;&#34;&gt;
 &lt;caption&gt;mkt ATE on sales&lt;/caption&gt;
 &lt;colgroup&gt;
 &lt;col width=&#34;9%&#34; /&gt;
 &lt;col width=&#34;6%&#34; /&gt;
-&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;12%&#34; /&gt;
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class=&#34;header&#34;&gt;
@@ -326,7 +548,8 @@ pandoc.table(mkt_ATE_on_sales,
 &lt;p&gt;Now let’s take a more complicated model defined by the following equations:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[sales = quadratic\left(1.5 \cdot visits -4 \cdot  comp\right) + \epsilon_{sales}\]&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[visits = 0.5I(mkt = &amp;quot;medium&amp;quot;) + 1.2I(mkt = &amp;quot;high&amp;quot;) + \epsilon_{visits}\]&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[mkt = cat(exp(2 \cdot comp) + \epsilon_{mkt})\]&lt;/span&gt; with &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; taking the levels “low”, “medium” and “high”.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[mkt = cat(exp(2 \cdot comp) + \epsilon_{mkt})\]&lt;/span&gt;
+with &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; taking the levels “low”, “medium” and “high”.&lt;/p&gt;
 &lt;p&gt;Below is the code to define the model defined by the equations above and get the corresponding ate of mkt on sales.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;- parametric_dag_model(dag = g, 
                                         f.args = list(
@@ -385,11 +608,11 @@ sim_data %&amp;gt;%
   summarise(sales = mean(sales)) %&amp;gt;%
   mutate(sales_diff = sales - lag(sales)) %&amp;gt;%
   pandoc.table()&lt;/code&gt;&lt;/pre&gt;
-&lt;table style=&#34;width:40%;&#34;&gt;
+&lt;table style=&#34;width:42%;&#34;&gt;
 &lt;colgroup&gt;
 &lt;col width=&#34;12%&#34; /&gt;
 &lt;col width=&#34;11%&#34; /&gt;
-&lt;col width=&#34;16%&#34; /&gt;
+&lt;col width=&#34;18%&#34; /&gt;
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class=&#34;header&#34;&gt;
@@ -431,13 +654,13 @@ sim_data %&amp;gt;%
                            &amp;quot;PhD&amp;quot;))
 pandoc.table(educ_ate_on_vocab, 
              caption = &amp;quot;educ ATE on vocab&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;table style=&#34;width:50%;&#34;&gt;
+&lt;table style=&#34;width:51%;&#34;&gt;
 &lt;caption&gt;educ ATE on vocab&lt;/caption&gt;
 &lt;colgroup&gt;
 &lt;col width=&#34;9%&#34; /&gt;
 &lt;col width=&#34;6%&#34; /&gt;
 &lt;col width=&#34;12%&#34; /&gt;
-&lt;col width=&#34;20%&#34; /&gt;
+&lt;col width=&#34;22%&#34; /&gt;
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class=&#34;header&#34;&gt;

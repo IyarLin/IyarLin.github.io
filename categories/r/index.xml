@@ -35,7 +35,7 @@
 &lt;p&gt;When both X and Y are continuous, we can use the generalized correlation measure developed by &lt;a href=&#34;http://dx.doi.org/10.1080/03610918.2015.1122048&#34;&gt;Vinod&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;When both X and Y are discrete, we can use the distance correlation measure (see &lt;a href=&#34;https://arxiv.org/pdf/1803.07712.pdf&#34;&gt;Liu and Chan, 2016&lt;/a&gt;).&lt;/p&gt;
 &lt;p&gt;When either X or Y are discrete, and the other is continuous we can discretisize the continuous variable (using for example the procedure at &lt;em&gt;infotheo::discretize&lt;/em&gt;) and use the method for 2 discrete variables mentioned above.&lt;/p&gt;
-&lt;p&gt;The orientDAG package uses the approach outlined above to orient DAG skeleton edges. To demonstrate how it works let’s go back to the example shown on my last post.&lt;/p&gt;
+&lt;p&gt;The &lt;a href=&#34;https://github.com/IyarLin/orientDAG&#34;&gt;orientDAG&lt;/a&gt; package uses the approach outlined above to orient DAG skeleton edges. To demonstrate how it works let’s go back to the example shown on my last post.&lt;/p&gt;
 &lt;p&gt;We used the &lt;a href=&#34;https://github.com/IyarLin/simMixedDAG&#34;&gt;simMixedDAG&lt;/a&gt; package to simulate datasets from the DAG below:&lt;/p&gt;
 &lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Following the bench-marking results on my last post we’ll restrict our attention to the &lt;em&gt;bnlearn::tabu&lt;/em&gt; function for learning the DAG skeleton.&lt;/p&gt;

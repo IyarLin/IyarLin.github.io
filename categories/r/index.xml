@@ -6,10 +6,90 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 17 Oct 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 21 Jan 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Automatic DAG learning - part 2</title>
+      <link>/2020/01/21/automatic_dag_learning_part_2/</link>
+      <pubDate>Tue, 21 Jan 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/01/21/automatic_dag_learning_part_2/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/orientDAGhex.png&#34; /&gt;&lt;/p&gt;
+&lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Intro&lt;/h1&gt;
+&lt;p&gt;We’ve seen on a previous &lt;a href=&#34;https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/&#34;&gt;post&lt;/a&gt; that one of the main differences between classic ML and Causal Inference is the additional step of using the correct adjustment set for the predictor features.&lt;/p&gt;
+&lt;p&gt;In order to find the correct adjustment set we need a DAG that represents the relationships between all features relevant to our problem.&lt;/p&gt;
+&lt;p&gt;One way of obtaining the DAG would be consulting domain experts. That however makes the process less accessible to wide audiences and more manual in nature. Learning the DAG from data automatically can thus make Causal Inference more streamlined usable.&lt;/p&gt;
+&lt;p&gt;On my last &lt;a href=&#34;https://iyarlin.github.io/2019/10/17/automatic_dag_learning_part_1/&#34;&gt;blog post&lt;/a&gt; we’ve hit a dead-end when it seemed non of the algorithms surveyed was able to learn the DAG accurately enough.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;enter-orientdag-package&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Enter: orientDAG package&lt;/h1&gt;
+&lt;p&gt;While the algorithms surveyed on my last post were able to converge on the correct DAG skeleton (find edge presence without it’s orientation) they all failed in orienting the edges correctly. This means that for a given pair of variables X,Y the algorithms were able to tell if they are causally linked, but unable to determine if X causes Y or vice versa.&lt;/p&gt;
+&lt;p&gt;We can utilize literature centered around finding causal direction to correctly orient DAG edges after learning it’s skeleton.&lt;/p&gt;
+&lt;p&gt;When both X and Y are continuous, we can use the generalized correlation measure developed by &lt;a href=&#34;http://dx.doi.org/10.1080/03610918.2015.1122048&#34;&gt;Vinod&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;When both X and Y are discrete, we can use the distance correlation measure (see &lt;a href=&#34;https://arxiv.org/pdf/1803.07712.pdf&#34;&gt;Liu and Chan, 2016&lt;/a&gt;).&lt;/p&gt;
+&lt;p&gt;When either X or Y are discrete, and the other is continuous we can discretisize the continuous variable (using for example the procedure at &lt;em&gt;infotheo::discretize&lt;/em&gt;) and use the method for 2 discrete variables mentioned above.&lt;/p&gt;
+&lt;p&gt;The orientDAG package uses the approach outlined above to orient DAG skeleton edges. To demonstrate how it works let’s go back to the example shown on my last post.&lt;/p&gt;
+&lt;p&gt;We used the &lt;a href=&#34;https://github.com/IyarLin/simMixedDAG&#34;&gt;simMixedDAG&lt;/a&gt; package to simulate datasets from the DAG below:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Following the bench-marking results on my last post we’ll restrict our attention to the &lt;em&gt;bnlearn::tabu&lt;/em&gt; function for learning the DAG skeleton.&lt;/p&gt;
+&lt;p&gt;The main function in the orientDAG is fittingly called &lt;code&gt;orient_dag&lt;/code&gt;. It takes as input an adjacency matrix where a 1 in the i,j position denotes an arrow from node i to node j.&lt;/p&gt;
+&lt;p&gt;Below we can see the adjacency matrix corresponding to the DAG above:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;##            age ageGroup educ educGroup gender nativeBorn vocab year
+## age          0        0    0         1      0          1     0    0
+## ageGroup     0        0    0         0      0          0     0    0
+## educ         1        0    0         0      1          0     0    1
+## educGroup    0        0    0         0      0          0     0    0
+## gender       0        0    0         0      0          0     0    0
+## nativeBorn   0        1    0         0      0          0     1    0
+## vocab        0        0    0         0      1          0     0    1
+## year         0        0    0         0      0          0     0    0&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The package also contains utility functions that facilitate DAG conversion between different representations. We can thus take the fitted &lt;em&gt;bn&lt;/em&gt; DAG object from the &lt;em&gt;tabu&lt;/em&gt; function and convert it to an adjacency matrix using the function &lt;code&gt;bn_to_adjmatrix&lt;/code&gt;. The DAG below shows all conversions available in the package:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;As before, we’ll measure DAG learning accuracy by the &lt;a href=&#34;https://arxiv.org/abs/1306.1043&#34;&gt;Structural Intervention Distance&lt;/a&gt;. For every sample size &lt;span class=&#34;math inline&#34;&gt;\(n\)&lt;/span&gt; I simulate 100 datasets and measure SID. Below I compare the SID distribution for 3 algorithms:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;em&gt;tabu&lt;/em&gt;: DAGs obtained using the &lt;em&gt;tabu&lt;/em&gt; function from the &lt;em&gt;bnlearn&lt;/em&gt; package&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;tabu + orientDAG&lt;/em&gt;: DAGs obtained by further orienting the DAG’s from &lt;em&gt;tabu&lt;/em&gt; using the &lt;em&gt;orientDAG&lt;/em&gt; package&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;em&gt;random&lt;/em&gt;: DAGs obtained by randomly re-orienting the DAGs obtained by the &lt;em&gt;tabu&lt;/em&gt; function&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that the &lt;em&gt;tabu&lt;/em&gt; performance deteriorates as sample size grows while &lt;em&gt;tabu + orientDAG&lt;/em&gt; improves.&lt;/p&gt;
+&lt;p&gt;From SID we can derive a more intuitive measure: The probability of finding the correct adjustment set for a randomly chosen pair of treatment-exposure variables:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[P(\text{correct adj set)} = 1 - \frac{SID}{\#\{\text{possible treatment - exposure pairs}\}}\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Below we can see the corresponding plot:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;For &lt;span class=&#34;math inline&#34;&gt;\(n = 80,000\)&lt;/span&gt; the &lt;em&gt;orientDAG&lt;/em&gt; package about doubles the performance compared with &lt;em&gt;tabu&lt;/em&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;bayesian-network-dgp&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Bayesian Network DGP&lt;/h1&gt;
+&lt;p&gt;In the above example the underlying data generating process (DGP) didn’t conform to the Bayesian Network (BN) assumptions, which might explain the deteriorating performance of the &lt;em&gt;tabu&lt;/em&gt; function.&lt;/p&gt;
+&lt;p&gt;Let’s see how the different algorithms fare when the underlying DGP does conform to the BN assumptions.&lt;/p&gt;
+&lt;p&gt;Below I plot the “mehra” DAG taken from the bnlearn package:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;The above DAG contains 24 nodes, of which 8 are categorical. The nodes are connected by 71 arrows.&lt;/p&gt;
+&lt;p&gt;Below we can see SID for the different algorithms (this time running only 10 simulations per sample size due to the network size):&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can now see that when the BN assumptions hold the &lt;em&gt;tabu&lt;/em&gt; function fares best as expected, while the &lt;em&gt;tabu + orientDAG&lt;/em&gt; fares as bad as a random guess or even worse. It’s possible that the &lt;em&gt;tabu + orientDAG&lt;/em&gt; performance is worse because it uses tests unrelated to the BN assumptions thus introducing noise to edges which are already oriented correctly by &lt;em&gt;tabu&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;We can mitigate such performance deterioration by introducing regularization parameters which force &lt;code&gt;orient_dag&lt;/code&gt; to re-orient an edge only in cases where there is strong evidence for a given orientation. Namely, the difference between distance correlation/generalized correlations must exceed some threshold. We’ll call this approach &lt;em&gt;tabu + orientDAG - conservative&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Below we can see the resulting performance measures:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;While the &lt;em&gt;tabu + orientDAG&lt;/em&gt; still fares worse then &lt;em&gt;tabu&lt;/em&gt;, it still is able to marginally at least outperform a random guess.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;conclusion&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;Conclusion&lt;/h1&gt;
+&lt;p&gt;It would seem that automatic learning of DAGs is highly dependent on knowing the underlying DGP assumptions and also requires very large sample sizes - thus making automatic learning of DAGs unreliable (at least for the examples surveyed in this post).&lt;/p&gt;
+&lt;p&gt;It may be that a hybrid solution where some edges are white-listed (their presence and orientation are assumed known) and some are blacklisted (are assumed to be known not to exist) by an expert, followed by an automatic algorithm can produce more reliable results.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Automatic DAG learning - part 1</title>

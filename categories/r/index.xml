@@ -6,10 +6,347 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 21 Jan 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 20 Apr 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>dowhy library exploration</title>
+      <link>/2020/04/20/dowhy_exploration/</link>
+      <pubDate>Mon, 20 Apr 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/04/20/dowhy_exploration/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/reticulated_python.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;It is not often that I find myself thinking “man, I wish we had in R that cool python library!”. That is however the case with the &lt;a href=&#34;https://microsoft.github.io/dowhy/&#34;&gt;&lt;em&gt;dowhy&lt;/em&gt;&lt;/a&gt; library which “provides a unified interface for causal inference methods and automatically tests many assumptions, thus making inference accessible to non-experts”.&lt;/p&gt;
+&lt;p&gt;Luckily enough though, the awesome folks at Rstudio have written the &lt;a href=&#34;https://rstudio.github.io/reticulate/&#34;&gt;&lt;em&gt;reticulate&lt;/em&gt;&lt;/a&gt; package just for that sort of occasion: It “provides a comprehensive set of tools for interoperability between Python and R”.&lt;/p&gt;
+&lt;p&gt;In this post I’ll set about exploring the &lt;em&gt;dowhy&lt;/em&gt; library while never leaving my Rstudio IDE or even writing python code!&lt;/p&gt;
+&lt;p&gt;Below we set up a python virtual environment and install the &lt;em&gt;dowhy&lt;/em&gt; dependencies:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;# create a new environment
+virtualenv_create(&amp;quot;r-reticulate&amp;quot;)
+
+# install python packages into virtualenv
+virtualenv_install(&amp;quot;r-reticulate&amp;quot;, c(&amp;quot;numpy&amp;quot;, &amp;quot;scipy&amp;quot;, &amp;quot;scikit-learn&amp;quot;, &amp;quot;pandas&amp;quot;, &amp;quot;dowhy&amp;quot;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Be sure to use python 3+. If you’re using windows you are out of luck as these support conda environments only and I’m not sure conda support &lt;em&gt;dowhy&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Next, we import the dowhy module right into our R session!&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;dowhy &amp;lt;- import(&amp;quot;dowhy&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let’s reproduce the first &lt;a href=&#34;https://microsoft.github.io/dowhy/example_notebooks/dowhy_simple_example.html&#34;&gt;simple example&lt;/a&gt; from the &lt;em&gt;dowhy&lt;/em&gt; site.&lt;/p&gt;
+&lt;p&gt;For simplicity, we simulate a dataset with linear relationships between common causes and treatment, and common causes and outcome.&lt;/p&gt;
+&lt;p&gt;Beta is the true causal effect and is equal to 10. Below we generate the linear dataset:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data &amp;lt;- dowhy$datasets$linear_dataset(
+  beta = 10L,
+  num_common_causes = 5L,
+  num_instruments = 2L,
+  num_effect_modifiers = 1L,
+  num_samples = 10000L,
+  treatment_is_binary = T
+)
+df_r &amp;lt;- py_to_r(data[[&amp;quot;df&amp;quot;]]) # to be used later&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Below we can see the first few rows:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data[&amp;quot;df&amp;quot;]$df$head() %&amp;gt;% pandoc.table(split.tables = Inf)&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;colgroup&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;5%&#34; /&gt;
+&lt;col width=&#34;9%&#34; /&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;8%&#34; /&gt;
+&lt;col width=&#34;9%&#34; /&gt;
+&lt;/colgroup&gt;
+&lt;thead&gt;
+&lt;tr class=&#34;header&#34;&gt;
+&lt;th align=&#34;center&#34;&gt;X0&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Z0&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;Z1&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;W0&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;W1&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;W2&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;W3&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;W4&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;v0&lt;/th&gt;
+&lt;th align=&#34;center&#34;&gt;y&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.1236&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.741&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.659&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2614&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.2472&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1899&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.6062&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;18.24&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.3468&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.5111&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2102&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9326&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3437&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9736&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.8639&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;6.882&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;0.8701&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3066&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.31&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.965&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2338&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.1431&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9677&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;22.94&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;even&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;-0.2349&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2999&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.06766&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.7691&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.175&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.573&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.966&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;FALSE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-4.887&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr class=&#34;odd&#34;&gt;
+&lt;td align=&#34;center&#34;&gt;-0.045&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4588&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.9863&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.0372&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9543&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.5231&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.025&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;FALSE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.24&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;We are interested with estimating the causal effect of &lt;span class=&#34;math inline&#34;&gt;\(v0\)&lt;/span&gt; (a binary treatment) on &lt;span class=&#34;math inline&#34;&gt;\(y\)&lt;/span&gt; (10 in this case). The &lt;em&gt;dowhy&lt;/em&gt; library streamlines the process of estimating and validating the causal estimate by introducing a flow consisting of 4 key steps. The first is enumerating our assumed causal model, as encoded by a DAG.&lt;/p&gt;
+&lt;div id=&#34;enumerate-the-assumed-causal-model&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;1) Enumerate the assumed causal model&lt;/h1&gt;
+&lt;p&gt;The above data object contains the underlying DAG representation. I’ve found that converting dot graphs to dagitty format is pretty straight forward and we’ll use that to plot the graph:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;dagitty_graph &amp;lt;- data[[&amp;quot;dot_graph&amp;quot;]]
+dagitty_graph &amp;lt;- gsub(&amp;quot;digraph&amp;quot;, &amp;quot;dag&amp;quot;, dagitty_graph)
+dagitty_graph &amp;lt;- dagitty(dagitty_graph)
+# let&amp;#39;s arrange the nodes to conform with what is shown in the dowhy example
+coordinates(dagitty_graph) &amp;lt;- list(
+  x = c(
+    U = 0, W0 = 1, W1 = 2, W2 = 3, W3 = 6, W4 = 7,
+    X0 = 6.5, Z0 = 4, Z1 = 5, v0 = 3.5, y = 3
+  ),
+  y = c(
+    U = 0, W0 = 0, W1 = 0, W2 = 0, W3 = 0, W4 = 0,
+    X0 = -1, Z0 = 0, Z1 = 0, v0 = -1, y = -2
+  )
+)
+
+ggdag(tidy_dagitty(dagitty_graph)) + theme_dag_blank() + 
+  annotate(geom = &amp;quot;text&amp;quot;, x = 0, y = 0.3, label = &amp;quot;Unobserved \n confounders&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We enumerate the causal model using the following code:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- dowhy$CausalModel(
+  data = data[[&amp;quot;df&amp;quot;]],
+  treatment = data[[&amp;quot;treatment_name&amp;quot;]],
+  outcome = data[[&amp;quot;outcome_name&amp;quot;]],
+  graph = data[[&amp;quot;gml_graph&amp;quot;]]
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;enumerate-identification-strategies&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;2) Enumerate identification strategies&lt;/h1&gt;
+&lt;p&gt;The next step is enumerating the identification strategies available given the above graph:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;identified_estimand &amp;lt;- model$identify_effect(proceed_when_unidentifiable = T)
+
+print(identified_estimand)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Estimand type: nonparametric-ate
+## ### Estimand : 1
+## Estimand name: backdoor
+## Estimand expression:
+##   d                                 
+## ─────(Expectation(y|W1,W0,W2,W4,W3))
+## d[v₀]                               
+## Estimand assumption 1, Unconfoundedness: If U→{v0} and U→y then P(y|v0,W1,W0,W2,W4,W3,U) = P(y|v0,W1,W0,W2,W4,W3)
+## ### Estimand : 2
+## Estimand name: iv
+## Estimand expression:
+## Expectation(Derivative(y, [Z0, Z1])*Derivative([v0], [Z0, Z1])**(-1))
+## Estimand assumption 1, As-if-random: If U→→y then ¬(U →→{Z0,Z1})
+## Estimand assumption 2, Exclusion: If we remove {Z0,Z1}→{v0}, then ¬({Z0,Z1}→y)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see that there are 2 possible ways of estimating the causal effect: Either using the backdoor criteria or with instrument variables (IV).&lt;/p&gt;
+&lt;p&gt;We can really see how &lt;em&gt;dowhy&lt;/em&gt; how does a great job at making causal discovery transparent and explicit in each step of the process.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;estimate-the-causal-effect&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;3) Estimate the causal effect&lt;/h1&gt;
+&lt;p&gt;Next up is doing the actual estimation.&lt;/p&gt;
+&lt;p&gt;We’ll first try the IV estimand:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;causal_estimate &amp;lt;- model$estimate_effect(
+  identified_estimand = identified_estimand,
+  method_name = &amp;quot;iv.instrumental_variable&amp;quot;
+)
+
+print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 14.5722987087289&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next, let’s try the backdoor estimand, using propensity score stratification:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;causal_estimate &amp;lt;- model$estimate_effect(
+  identified_estimand = identified_estimand,
+  method_name = &amp;quot;backdoor.propensity_score_stratification&amp;quot;
+)
+
+print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 10.2974994551257&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;validate-estimated-causal-effect&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;4) Validate estimated causal effect&lt;/h1&gt;
+&lt;p&gt;The last step consists of analyzing the level of confidence we have in the estimated causal effect. We’ll proceed with the backdoor estimate.&lt;/p&gt;
+&lt;p&gt;Let’s start by adding a random (observed) confounder:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_random &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;random_common_cause&amp;quot;
+)
+
+print(res_random)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Add a Random Common Cause
+## Estimated effect:(10.297499455125735,)
+## New effect:(10.329135890941698,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see the result is pretty stable. This means our sample size (10,000) is probably large enough to accommodate further confounders without loss of accuracy.&lt;/p&gt;
+&lt;p&gt;Next, let’s see how adding an unobserved confounder can change our estimate. In the code below the &lt;code&gt;effect_strength_on_treatment&lt;/code&gt; argument denotes the probability of the confounder flipping the treatment from 0 to 1 (or vice verca). The &lt;code&gt;effect_strength_on_outcome&lt;/code&gt; denotes the linear coefficient of the confounder on the outcome.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;add_unobserved_common_cause&amp;quot;,
+  confounders_effect_on_treatment = &amp;quot;binary_flip&amp;quot;,
+  confounders_effect_on_outcome = &amp;quot;linear&amp;quot;,
+  effect_strength_on_treatment = 0.01,
+  effect_strength_on_outcome = 0.02
+)
+
+print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
+## Estimated effect:(10.297499455125735,)
+## New effect:(9.992195972192327,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;When using the effect strength values given in the example the effect on our estimate seems modest. Let’s try adding a stronger confounder:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;add_unobserved_common_cause&amp;quot;,
+  confounders_effect_on_treatment = &amp;quot;binary_flip&amp;quot;,
+  confounders_effect_on_outcome = &amp;quot;linear&amp;quot;,
+  effect_strength_on_treatment = 0.05,
+  effect_strength_on_outcome = 1
+)
+
+print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
+## Estimated effect:(10.297499455125735,)
+## New effect:(7.065846279246412,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It’s pretty surprising to see how bad our estimate would be given a single un-observed confounder with what I’d consider mild confounding effect.&lt;/p&gt;
+&lt;p&gt;What’s weirder is that the confounder can affect only the treatment (setting &lt;code&gt;effect_strength_on_outcome = 0&lt;/code&gt;, essentially making it a non confounder) and still destabilize the estimate in pretty much the same way:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;add_unobserved_common_cause&amp;quot;,
+  confounders_effect_on_treatment = &amp;quot;binary_flip&amp;quot;,
+  confounders_effect_on_outcome = &amp;quot;linear&amp;quot;,
+  effect_strength_on_treatment = 0.05,
+  effect_strength_on_outcome = 0
+)
+
+print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
+## Estimated effect:(10.297499455125735,)
+## New effect:(6.821708758664067,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I’ll probably need to research the internal mechanics a bit more to understand how that’s possible.&lt;/p&gt;
+&lt;p&gt;Let’s try permuting the treatment (making it effectively a placebo) and see how our estimate changes:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_placebo &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;placebo_treatment_refuter&amp;quot;,
+  placebo_type = &amp;quot;permute&amp;quot;
+)
+
+print(res_placebo)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Use a Placebo Treatment
+## Estimated effect:(10.297499455125735,)
+## New effect:(0.1271016806333491,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see that the estimated effect is essentially 0, which is what we’d like to see (this means our estimator doesn’t catch random noise as treatment effect).&lt;/p&gt;
+&lt;p&gt;Finally, let’s see how sensitive is our estimate to removal of 10% of the observations:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_subset &amp;lt;- model$refute_estimate(
+  estimand = identified_estimand,
+  estimate = causal_estimate,
+  method_name = &amp;quot;data_subset_refuter&amp;quot;,
+  subset_fraction = 0.9,
+  random_seed = 1L
+)
+
+print(res_subset)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Refute: Use a subset of data
+## Estimated effect:(10.297499455125735,)
+## New effect:(10.333160141396403,)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Pretty stable. Thinking about this a bit more I believe this is very similar to using bootstrap sampling to evaluate the estimate variability. Let’s implement bootstrap sampling for variability estimation just for fun:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;if (!&amp;quot;res.rds&amp;quot; %in% list.files(&amp;quot;../../../&amp;quot;)) {
+  set.seed(1)
+  M &amp;lt;- 100
+  res &amp;lt;- vector(length = M)
+
+  for (m in 1:M) {
+    bootstarpped_data &amp;lt;- df_r[sample.int(
+      n = nrow(df_r),
+      nrow(df_r), replace = T
+    ), ]
+
+    dat_m &amp;lt;- r_to_py(bootstarpped_data)
+
+    model_m &amp;lt;- dowhy$CausalModel(
+      data = dat_m,
+      treatment = data[[&amp;quot;treatment_name&amp;quot;]],
+      outcome = data[[&amp;quot;outcome_name&amp;quot;]],
+      graph = data[[&amp;quot;gml_graph&amp;quot;]]
+    )
+    identified_estimand &amp;lt;- model_m$identify_effect(
+      proceed_when_unidentifiable = T
+    )
+    causal_estimate &amp;lt;- model_m$estimate_effect(
+      identified_estimand = identified_estimand,
+      method_name = &amp;quot;backdoor.propensity_score_stratification&amp;quot;
+    )
+    res[m] &amp;lt;- causal_estimate$value
+  }
+  saveRDS(res, &amp;quot;../../../res.rds&amp;quot;)
+} else {
+  res &amp;lt;- readRDS(&amp;quot;../../../res.rds&amp;quot;)
+}
+
+res_sd &amp;lt;- round(sd(res), 4)
+
+data.frame(causal_estimate = res) %&amp;gt;%
+  ggplot(aes(causal_estimate)) + geom_histogram(bins = 10) +
+  annotate(
+    geom = &amp;quot;text&amp;quot;, x = mean(res), y = 5,
+    label = paste0(&amp;quot;SD = &amp;quot;, res_sd),
+    color = &amp;quot;red&amp;quot;, size = 6
+  )&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Oddly enough it would seem the estimate is pretty far off from 10.&lt;/p&gt;
+&lt;p&gt;The code above demonstrates how &lt;em&gt;reticulate&lt;/em&gt; enables seamless simultaneous coding in Python and R.&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Automatic DAG learning - part 2</title>

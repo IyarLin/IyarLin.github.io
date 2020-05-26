@@ -6,10 +6,295 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 20 Apr 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 26 May 2020 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>dtplyr speed benchmarks</title>
+      <link>/2020/05/26/dtplyr_benchmarks/</link>
+      <pubDate>Tue, 26 May 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/05/26/dtplyr_benchmarks/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;/post/tdplyr_benchmarking_files/race_cars.jpg&#34; width=&#34;450&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;R has many great tools for data wrangling. Two of those are the &lt;em&gt;dplyr&lt;/em&gt; and &lt;em&gt;data.table&lt;/em&gt; packages. When people wonder which one should they learn it is often argued that &lt;em&gt;dplyr&lt;/em&gt; is considerably slower compared with &lt;em&gt;data.table&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Granted, &lt;em&gt;data.table&lt;/em&gt; is blazing fast, but I personally find the syntax hard and un-intuitive and the speed difference doesn’t make much of a difference in most use cases I encountered.&lt;/p&gt;
+&lt;p&gt;The only frequent scenario where I’ve experienced a significant performance gap is when doing operations over a very large number of groups. This can happen when for example working with customer data, where each row describes a touch point or transaction and one is interested with calculating the number of rows per customer, monetary value of all transactions per customer etc.&lt;/p&gt;
+&lt;p&gt;Recently Rstudio &lt;a href=&#34;https://www.tidyverse.org/blog/2019/11/dtplyr-1-0-0/&#34;&gt;released&lt;/a&gt; &lt;em&gt;dtplyr&lt;/em&gt; package version 1.0.0 which provides a &lt;em&gt;data.table&lt;/em&gt; backend for &lt;em&gt;dplyr&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Using &lt;em&gt;dtplyr&lt;/em&gt; requires learning almost no additional code. One initiates a &lt;em&gt;data.table&lt;/em&gt; sequence using the &lt;code&gt;lazy_dt&lt;/code&gt; function, after which regular &lt;em&gt;dplyr&lt;/em&gt; code is written. Execution of the code is done only when calling &lt;code&gt;as_tibble&lt;/code&gt; (or &lt;code&gt;as.data.frame&lt;/code&gt; etc).&lt;/p&gt;
+&lt;p&gt;So for example a simple pipeline utilizing &lt;em&gt;dtplyr&lt;/em&gt; for many group operations would look like:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;mtcars %&amp;gt;%
+  lazy_dt() %&amp;gt;%
+  filter(wt &amp;lt; 5) %&amp;gt;%
+  mutate(l100k = 235.21 / mpg) %&amp;gt;% # liters / 100 km
+  group_by(cyl) %&amp;gt;%
+  summarise(l100k = mean(l100k))&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## Source: local data table [?? x 2]
+## Call:   `_DT1`[wt &amp;lt; 5][, `:=`(l100k = 235.21/mpg)][, .(l100k = mean(l100k)), 
+##     keyby = .(cyl)]
+## 
+##     cyl l100k
+##   &amp;lt;dbl&amp;gt; &amp;lt;dbl&amp;gt;
+## 1     4  9.05
+## 2     6 12.0 
+## 3     8 14.9 
+## 
+## # Use as.data.table()/as.data.frame()/as_tibble() to access results&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The only caveat is, as with all other &lt;em&gt;dbplyr&lt;/em&gt; like interfaces, that some of the more complex operations might not be supported.&lt;/p&gt;
+&lt;p&gt;Interestingly enough, I wasn’t able to find any bench-marking for &lt;em&gt;dtplyr&lt;/em&gt; other than a walled piece on Medium. So I decided to go ahead and run a quick benchmark test myself.&lt;/p&gt;
+&lt;p&gt;In this post I’ll check by how much does &lt;em&gt;dtplyr&lt;/em&gt; improve on &lt;em&gt;dplyr&lt;/em&gt; and whether it’s performance is close enough to &lt;em&gt;data.table&lt;/em&gt; to be considered a valid alternative.&lt;/p&gt;
+&lt;p&gt;To that end, I’ll reproduce some of the &lt;a href=&#34;https://github.com/Rdatatable/data.table/wiki/Benchmarks-%3A-Grouping&#34;&gt;benchmarking&lt;/a&gt; done by data.table author Matt Dowle back at Dec 2018.&lt;/p&gt;
+&lt;p&gt;The bench-marking consist of:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;5 simple queries: large groups and small groups on different columns of different types. Similar to what a data analyst might do in practice; i.e., various ad hoc aggregations as the data is explored and investigated.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Each package is tested separately in its own fresh session. To that end I’ve restarted my machine before running the benchmark code for every package.&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;Each query is repeated once more, immediately. This is to isolate cache effects and confirm the first timing. The first and second total elapsed times are plotted.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;My analysis will diverge from the original in the following respects:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;I’ll compare &lt;em&gt;data.table&lt;/em&gt;, &lt;em&gt;dtyplr&lt;/em&gt; and &lt;em&gt;dplyr&lt;/em&gt;. I’ll also check how starting a &lt;em&gt;dtplyr&lt;/em&gt; pipe with a &lt;code&gt;data.table&lt;/code&gt; rather than a &lt;code&gt;data.frame&lt;/code&gt; affects performance (dubbed &lt;em&gt;dt_dtplyr&lt;/em&gt; below)&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;I’ll use my personal laptop instead of spinning up a virtual machine&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;I’m generating a much smaller dataset (~4.9 Gb). I think that is representative of some of the larger datasets I’ve worked with in-memory (for larger datasets I usually switch to Spark).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Other than that the code is mostly the same.&lt;/p&gt;
+&lt;details&gt;
+&lt;summary&gt;data.table benchmark code&lt;/summary&gt;
+&lt;p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;require(data.table)
+N &amp;lt;- 1e8
+K &amp;lt;- 100
+set.seed(1)
+DT &amp;lt;- data.table(
+  id1 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE), # large groups (char)
+  id2 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE), # large groups (char)
+  id3 = sample(sprintf(&amp;quot;id%010d&amp;quot;, 1:(N / K)), N, TRUE), # small groups (char)
+  id4 = sample(K, N, TRUE), # large groups (int)
+  id5 = sample(K, N, TRUE), # large groups (int)
+  id6 = sample(N / K, N, TRUE), # small groups (int)
+  v1 = sample(5, N, TRUE), # int in range [1,5]
+  v2 = sample(5, N, TRUE), # int in range [1,5]
+  v3 = sample(round(runif(100, max = 100), 4), N, TRUE) # numeric e.g. 23.5749
+)
+
+q1a &amp;lt;- system.time(DT[, sum(v1), keyby = id1])[3]
+q1b &amp;lt;- system.time(DT[, sum(v1), keyby = id1])[3]
+q2a &amp;lt;- system.time(DT[, sum(v1), keyby = &amp;quot;id1,id2&amp;quot;])[3]
+q2b &amp;lt;- system.time(DT[, sum(v1), keyby = &amp;quot;id1,id2&amp;quot;])[3]
+q3a &amp;lt;- system.time(DT[, list(sum(v1), mean(v3)), keyby = id3])[3]
+q3b &amp;lt;- system.time(DT[, list(sum(v1), mean(v3)), keyby = id3])[3]
+q4a &amp;lt;- system.time(DT[, lapply(.SD, mean), keyby = id4, .SDcols = 7:9])[3]
+q4b &amp;lt;- system.time(DT[, lapply(.SD, mean), keyby = id4, .SDcols = 7:9])[3]
+q5a &amp;lt;- system.time(DT[, lapply(.SD, sum), keyby = id6, .SDcols = 7:9])[3]
+q5b &amp;lt;- system.time(DT[, lapply(.SD, sum), keyby = id6, .SDcols = 7:9])[3]
+data_table_results &amp;lt;- list(
+  q1a = q1a, q1b = q1b,
+  q2a = q2a, q2b = q2b,
+  q3a = q3a, q3b = q3b,
+  q4a = q4a, q4b = q4b,
+  q5a = q5a, q5b = q5b
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/p&gt;
+&lt;/details&gt;
+&lt;details&gt;
+&lt;summary&gt;dtplyr benchmark code&lt;/summary&gt;
+&lt;p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;require(dplyr)
+require(dtplyr)
+N &amp;lt;- 1e8
+K &amp;lt;- 100
+set.seed(1)
+DF &amp;lt;- data.frame(
+  stringsAsFactors = FALSE,
+  id1 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id2 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id3 = sample(sprintf(&amp;quot;id%010d&amp;quot;, 1:(N / K)), N, TRUE),
+  id4 = sample(K, N, TRUE),
+  id5 = sample(K, N, TRUE),
+  id6 = sample(N / K, N, TRUE),
+  v1 = sample(5, N, TRUE),
+  v2 = sample(5, N, TRUE),
+  v3 = sample(round(runif(100, max = 100), 4), N, TRUE)
+)
+
+q1a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q1b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1, id2) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1, id2) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q3a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id3) %&amp;gt;% summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q3b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id3) %&amp;gt;%
+  summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q4a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q4b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q5a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+q5b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+
+dtplyr_results &amp;lt;- list(
+  q1a = q1a, q1b = q1b,
+  q2a = q2a, q2b = q2b,
+  q3a = q3a, q3b = q3b,
+  q4a = q4a, q4b = q4b,
+  q5a = q5a, q5b = q5b
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/p&gt;
+&lt;/details&gt;
+&lt;details&gt;
+&lt;summary&gt;dt_dtplyr benchmark code&lt;/summary&gt;
+&lt;p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;require(dplyr)
+require(dtplyr)
+library(data.table)
+N &amp;lt;- 1e8
+K &amp;lt;- 100
+set.seed(1)
+DF &amp;lt;- data.frame(
+  stringsAsFactors = FALSE,
+  id1 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id2 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id3 = sample(sprintf(&amp;quot;id%010d&amp;quot;, 1:(N / K)), N, TRUE),
+  id4 = sample(K, N, TRUE),
+  id5 = sample(K, N, TRUE),
+  id6 = sample(N / K, N, TRUE),
+  v1 = sample(5, N, TRUE),
+  v2 = sample(5, N, TRUE),
+  v3 = sample(round(runif(100, max = 100), 4), N, TRUE)
+)
+
+DF &amp;lt;- as.data.table(DF)
+
+q1a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q1b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1, id2) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id1, id2) %&amp;gt;%
+  summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q3a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id3) %&amp;gt;% summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q3b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id3) %&amp;gt;%
+  summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q4a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q4b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q5a &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+q5b &amp;lt;- system.time(DF %&amp;gt;% lazy_dt() %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+
+dt_dtplyr_results &amp;lt;- list(
+  q1a = q1a, q1b = q1b,
+  q2a = q2a, q2b = q2b,
+  q3a = q3a, q3b = q3b,
+  q4a = q4a, q4b = q4b,
+  q5a = q5a, q5b = q5b
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/p&gt;
+&lt;/details&gt;
+&lt;details&gt;
+&lt;summary&gt;dplyr benchmark code&lt;/summary&gt;
+&lt;p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;library(dplyr)
+N &amp;lt;- 1e8
+K &amp;lt;- 100
+set.seed(1)
+DF &amp;lt;- data.frame(
+  stringsAsFactors = FALSE,
+  id1 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id2 = sample(sprintf(&amp;quot;id%03d&amp;quot;, 1:K), N, TRUE),
+  id3 = sample(sprintf(&amp;quot;id%010d&amp;quot;, 1:(N / K)), N, TRUE),
+  id4 = sample(K, N, TRUE),
+  id5 = sample(K, N, TRUE),
+  id6 = sample(N / K, N, TRUE),
+  v1 = sample(5, N, TRUE),
+  v2 = sample(5, N, TRUE),
+  v3 = sample(round(runif(100, max = 100), 4), N, TRUE)
+)
+
+q1a &amp;lt;- system.time(DF %&amp;gt;% group_by(id1) %&amp;gt;% summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q1b &amp;lt;- system.time(DF %&amp;gt;% group_by(id1) %&amp;gt;% summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2a &amp;lt;- system.time(DF %&amp;gt;% group_by(id1, id2) %&amp;gt;% summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q2b &amp;lt;- system.time(DF %&amp;gt;% group_by(id1, id2) %&amp;gt;% summarise(sum(v1)) %&amp;gt;% as_tibble())[3]
+q3a &amp;lt;- system.time(DF %&amp;gt;% group_by(id3) %&amp;gt;% summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q3b &amp;lt;- system.time(DF %&amp;gt;% group_by(id3) %&amp;gt;%
+  summarise(sum(v1), mean(v3)) %&amp;gt;% as_tibble())[3]
+q4a &amp;lt;- system.time(DF %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q4b &amp;lt;- system.time(DF %&amp;gt;% group_by(id4) %&amp;gt;%
+  summarise_at(vars(v1:v3), mean) %&amp;gt;% as_tibble())[3]
+q5a &amp;lt;- system.time(DF %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+q5b &amp;lt;- system.time(DF %&amp;gt;% group_by(id6) %&amp;gt;%
+  summarise_at(vars(v1:v3), sum) %&amp;gt;% as_tibble())[3]
+
+dplyr_results &amp;lt;- list(
+  q1a = q1a, q1b = q1b,
+  q2a = q2a, q2b = q2b,
+  q3a = q3a, q3b = q3b,
+  q4a = q4a, q4b = q4b,
+  q5a = q5a, q5b = q5b
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/p&gt;
+&lt;/details&gt;
+&lt;p&gt;&lt;img src=&#34;/post/tdplyr_benchmarking_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;480&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We can see that using &lt;em&gt;dtplyr&lt;/em&gt; improves the performance quite a bit, though still not as fast as &lt;em&gt;data.table&lt;/em&gt;. It would seem however that most of the difference stems from the need to convert the &lt;code&gt;data.frame&lt;/code&gt; object to a &lt;code&gt;data.table&lt;/code&gt; one. That can be done once when reading in the file for example. Thus it would seem that ultimately the sacrifice in performance for the added benefit of tidy syntax (for those who dig tidy) isn’t too bad.&lt;/p&gt;
+&lt;p&gt;Personally, I’m hooked on the tidyverse and the &lt;em&gt;dtplyr&lt;/em&gt; package is just another reason to keep using it, even for operations over a large number of groups.&lt;/p&gt;
+&lt;div id=&#34;session-info&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Session info&lt;/h2&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;sessionInfo()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## R version 3.6.2 (2019-12-12)
+## Platform: x86_64-apple-darwin15.6.0 (64-bit)
+## Running under: macOS Mojave 10.14.6
+## 
+## Matrix products: default
+## BLAS:   /Library/Frameworks/R.framework/Versions/3.6/Resources/lib/libRblas.0.dylib
+## LAPACK: /Library/Frameworks/R.framework/Versions/3.6/Resources/lib/libRlapack.dylib
+## 
+## locale:
+## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+##  [1] data.table_1.12.8 pander_0.6.3      dtplyr_1.0.0      forcats_0.4.0    
+##  [5] stringr_1.4.0     dplyr_0.8.5       purrr_0.3.4       readr_1.3.1      
+##  [9] tidyr_1.0.3       tibble_3.0.1      ggplot2_3.3.0     tidyverse_1.3.0  
+## [13] pacman_0.5.1     
+## 
+## loaded via a namespace (and not attached):
+##  [1] tidyselect_1.1.0 xfun_0.12        haven_2.2.0      lattice_0.20-38 
+##  [5] colorspace_1.4-1 vctrs_0.3.0      generics_0.0.2   htmltools_0.4.0 
+##  [9] yaml_2.2.1       utf8_1.1.4       rlang_0.4.6      pillar_1.4.4    
+## [13] glue_1.4.1       withr_2.1.2      DBI_1.1.0        dbplyr_1.4.2    
+## [17] modelr_0.1.5     readxl_1.3.1     lifecycle_0.2.0  munsell_0.5.0   
+## [21] blogdown_0.17    gtable_0.3.0     cellranger_1.1.0 rvest_0.3.5     
+## [25] evaluate_0.14    labeling_0.3     knitr_1.27       fansi_0.4.1     
+## [29] broom_0.5.3      Rcpp_1.0.4.6     scales_1.1.0     backports_1.1.5 
+## [33] jsonlite_1.6.1   farver_2.0.3     fs_1.4.1         hms_0.5.3       
+## [37] digest_0.6.25    stringi_1.4.6    bookdown_0.17    grid_3.6.2      
+## [41] cli_2.0.2        tools_3.6.2      magrittr_1.5     crayon_1.3.4    
+## [45] pkgconfig_2.0.3  ellipsis_0.3.1   xml2_1.2.2       reprex_0.3.0    
+## [49] lubridate_1.7.8  assertthat_0.2.1 rmarkdown_2.0    httr_1.4.1      
+## [53] rstudioapi_0.11  R6_2.4.1         nlme_3.1-143     compiler_3.6.2&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>dowhy library exploration</title>
@@ -49,16 +334,16 @@ df_r &amp;lt;- py_to_r(data[[&amp;quot;df&amp;quot;]]) # to be used later&lt;/co
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;data[&amp;quot;df&amp;quot;]$df$head() %&amp;gt;% pandoc.table(split.tables = Inf)&lt;/code&gt;&lt;/pre&gt;
 &lt;table&gt;
 &lt;colgroup&gt;
-&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
 &lt;col width=&#34;5%&#34; /&gt;
-&lt;col width=&#34;9%&#34; /&gt;
 &lt;col width=&#34;10%&#34; /&gt;
-&lt;col width=&#34;10%&#34; /&gt;
-&lt;col width=&#34;10%&#34; /&gt;
-&lt;col width=&#34;10%&#34; /&gt;
-&lt;col width=&#34;10%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;11%&#34; /&gt;
+&lt;col width=&#34;7%&#34; /&gt;
 &lt;col width=&#34;8%&#34; /&gt;
-&lt;col width=&#34;9%&#34; /&gt;
 &lt;/colgroup&gt;
 &lt;thead&gt;
 &lt;tr class=&#34;header&#34;&gt;
@@ -76,64 +361,64 @@ df_r &amp;lt;- py_to_r(data[[&amp;quot;df&amp;quot;]]) # to be used later&lt;/co
 &lt;/thead&gt;
 &lt;tbody&gt;
 &lt;tr class=&#34;odd&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;0.1236&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4349&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.741&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;1.659&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.2614&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.2472&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.1899&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.6062&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.6183&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.193&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.58&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.824&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;2.392&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.732&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;18.24&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;23.05&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;0.3468&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.5111&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.2102&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.9326&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.3437&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.9736&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.8639&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9587&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3943&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3835&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.371&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-1.838&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.835&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.867&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;6.882&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;11.66&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;0.8701&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.3066&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;1.31&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;1.965&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.2338&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.1431&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.9677&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.986&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.8709&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.0708&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.3716&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.4343&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2224&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.561&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;22.94&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;9.258&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;even&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;-0.2349&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1813&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.2999&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.06766&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.7691&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-1.175&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-1.573&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-1.966&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;FALSE&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-4.887&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2285&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3961&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.1993&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.3843&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.2072&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.6096&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;12.79&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr class=&#34;odd&#34;&gt;
-&lt;td align=&#34;center&#34;&gt;-0.045&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.9915&lt;/td&gt;
 &lt;td align=&#34;center&#34;&gt;0&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.4588&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;0.9863&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.0372&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.9543&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-0.5231&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;-1.025&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;FALSE&lt;/td&gt;
-&lt;td align=&#34;center&#34;&gt;1.24&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.4394&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.6585&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;-0.5755&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.2262&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;1.332&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;0.365&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;TRUE&lt;/td&gt;
+&lt;td align=&#34;center&#34;&gt;15.58&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -178,17 +463,17 @@ print(identified_estimand)&lt;/code&gt;&lt;/pre&gt;
 ## Estimand name: backdoor
 ## Estimand expression:
 ##   d                                 
-## ─────(Expectation(y|W1,W0,W2,W4,W3))
+## ─────(Expectation(y|W3,W4,W1,W2,W0))
 ## d[v₀]                               
-## Estimand assumption 1, Unconfoundedness: If U→{v0} and U→y then P(y|v0,W1,W0,W2,W4,W3,U) = P(y|v0,W1,W0,W2,W4,W3)
+## Estimand assumption 1, Unconfoundedness: If U→{v0} and U→y then P(y|v0,W3,W4,W1,W2,W0,U) = P(y|v0,W3,W4,W1,W2,W0)
 ## ### Estimand : 2
 ## Estimand name: iv
 ## Estimand expression:
-## Expectation(Derivative(y, [Z0, Z1])*Derivative([v0], [Z0, Z1])**(-1))
-## Estimand assumption 1, As-if-random: If U→→y then ¬(U →→{Z0,Z1})
-## Estimand assumption 2, Exclusion: If we remove {Z0,Z1}→{v0}, then ¬({Z0,Z1}→y)&lt;/code&gt;&lt;/pre&gt;
+## Expectation(Derivative(y, [Z1, Z0])*Derivative([v0], [Z1, Z0])**(-1))
+## Estimand assumption 1, As-if-random: If U→→y then ¬(U →→{Z1,Z0})
+## Estimand assumption 2, Exclusion: If we remove {Z1,Z0}→{v0}, then ¬({Z1,Z0}→y)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can see that there are 2 possible ways of estimating the causal effect: Either using the backdoor criteria or with instrument variables (IV).&lt;/p&gt;
-&lt;p&gt;We can really see how &lt;em&gt;dowhy&lt;/em&gt; how does a great job at making causal discovery transparent and explicit in each step of the process.&lt;/p&gt;
+&lt;p&gt;We can really see how &lt;em&gt;dowhy&lt;/em&gt; does a great job at making causal discovery transparent and explicit in each step of the process.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;estimate-the-causal-effect&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;3) Estimate the causal effect&lt;/h1&gt;
@@ -200,7 +485,7 @@ print(identified_estimand)&lt;/code&gt;&lt;/pre&gt;
 )
 
 print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt;/code&gt;&lt;/pre&gt;
-&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 14.5722987087289&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 9.64967493839487&amp;quot;&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Next, let’s try the backdoor estimand, using propensity score stratification:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;causal_estimate &amp;lt;- model$estimate_effect(
   identified_estimand = identified_estimand,
@@ -208,7 +493,7 @@ print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt
 )
 
 print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt;/code&gt;&lt;/pre&gt;
-&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 10.2974994551257&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;Causal Estimate is 10.1306174998784&amp;quot;&lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 &lt;div id=&#34;validate-estimated-causal-effect&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;4) Validate estimated causal effect&lt;/h1&gt;
@@ -222,8 +507,8 @@ print(paste0(&amp;quot;Causal Estimate is &amp;quot;, causal_estimate$value))&lt
 
 print(res_random)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Add a Random Common Cause
-## Estimated effect:(10.297499455125735,)
-## New effect:(10.329135890941698,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(10.12114905599205,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can see the result is pretty stable. This means our sample size (10,000) is probably large enough to accommodate further confounders without loss of accuracy.&lt;/p&gt;
 &lt;p&gt;Next, let’s see how adding an unobserved confounder can change our estimate. In the code below the &lt;code&gt;effect_strength_on_treatment&lt;/code&gt; argument denotes the probability of the confounder flipping the treatment from 0 to 1 (or vice verca). The &lt;code&gt;effect_strength_on_outcome&lt;/code&gt; denotes the linear coefficient of the confounder on the outcome.&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
@@ -238,8 +523,8 @@ print(res_random)&lt;/code&gt;&lt;/pre&gt;
 
 print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
-## Estimated effect:(10.297499455125735,)
-## New effect:(9.992195972192327,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(9.452502128579503,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;When using the effect strength values given in the example the effect on our estimate seems modest. Let’s try adding a stronger confounder:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
   estimand = identified_estimand,
@@ -253,8 +538,8 @@ print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 
 print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
-## Estimated effect:(10.297499455125735,)
-## New effect:(7.065846279246412,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(5.444774309294754,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;It’s pretty surprising to see how bad our estimate would be given a single un-observed confounder with what I’d consider mild confounding effect.&lt;/p&gt;
 &lt;p&gt;What’s weirder is that the confounder can affect only the treatment (setting &lt;code&gt;effect_strength_on_outcome = 0&lt;/code&gt;, essentially making it a non confounder) and still destabilize the estimate in pretty much the same way:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_unobserved &amp;lt;- model$refute_estimate(
@@ -269,8 +554,8 @@ print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 
 print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Add an Unobserved Common Cause
-## Estimated effect:(10.297499455125735,)
-## New effect:(6.821708758664067,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(5.67025809685905,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;I’ll probably need to research the internal mechanics a bit more to understand how that’s possible.&lt;/p&gt;
 &lt;p&gt;Let’s try permuting the treatment (making it effectively a placebo) and see how our estimate changes:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_placebo &amp;lt;- model$refute_estimate(
@@ -282,8 +567,8 @@ print(res_unobserved)&lt;/code&gt;&lt;/pre&gt;
 
 print(res_placebo)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Use a Placebo Treatment
-## Estimated effect:(10.297499455125735,)
-## New effect:(0.1271016806333491,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(0.1424237753920382,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can see that the estimated effect is essentially 0, which is what we’d like to see (this means our estimator doesn’t catch random noise as treatment effect).&lt;/p&gt;
 &lt;p&gt;Finally, let’s see how sensitive is our estimate to removal of 10% of the observations:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;res_subset &amp;lt;- model$refute_estimate(
@@ -296,8 +581,8 @@ print(res_placebo)&lt;/code&gt;&lt;/pre&gt;
 
 print(res_subset)&lt;/code&gt;&lt;/pre&gt;
 &lt;pre&gt;&lt;code&gt;## Refute: Use a subset of data
-## Estimated effect:(10.297499455125735,)
-## New effect:(10.333160141396403,)&lt;/code&gt;&lt;/pre&gt;
+## Estimated effect:(10.130617499878428,)
+## New effect:(10.05344937871124,)&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;Pretty stable. Thinking about this a bit more I believe this is very similar to using bootstrap sampling to evaluate the estimate variability. Let’s implement bootstrap sampling for variability estimation just for fun:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;if (!&amp;quot;res.rds&amp;quot; %in% list.files(&amp;quot;../../../&amp;quot;)) {
   set.seed(1)

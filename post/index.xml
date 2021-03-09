@@ -1,26 +1,244 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Posts on Just be-cause</title>
-    <link>/post/</link>
+    <link>https://iyarlin.github.io/post/</link>
     <description>Recent content in Posts on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 26 May 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Tue, 09 Mar 2021 00:00:00 +0000</lastBuildDate>
     
-        <atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
+        <atom:link href="https://iyarlin.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>dtplyr speed benchmarks</title>
-      <link>/2020/05/26/dtplyr_benchmarks/</link>
-      <pubDate>Tue, 26 May 2020 00:00:00 +0000</pubDate>
+      <title>sparse matrix representation for ml in scale</title>
+      <link>https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/</link>
+      <pubDate>Tue, 09 Mar 2021 00:00:00 +0000</pubDate>
       
-      <guid>/2020/05/26/dtplyr_benchmarks/</guid>
+      <guid>https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/</guid>
       <description>
 
 
-&lt;p&gt;&lt;img src=&#34;/post/tdplyr_benchmarking_files/race_cars.jpg&#34; width=&#34;450&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sparse_matrix_representation_for_ml_in_scale_files/Andromeda_Galaxy_560mm_FL.jpeg&#34; width=&#34;600&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Am I the only one seeing here a sparse linear regression? Hopefully by the end
+of this post you’ll see it too (:&lt;/p&gt;
+&lt;p&gt;Its been a while since my last blog post as I’ve started working at
+&lt;a href=&#34;https://www.similarweb.com/&#34;&gt;SimilarWeb&lt;/a&gt; - A
+company that provides data on internet traffic for various use cases. During
+this time I’ve encountered an interesting ML problem setup that requires
+dealing with quite a few technical hurdles. In this blog post I’d like to share
+the problem and Scala spark recipe code to tackle it at scale.&lt;/p&gt;
+&lt;div id=&#34;some-motivation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Some motivation&lt;/h2&gt;
+&lt;p&gt;Since I can’t really divulge the specifics of the problem I’m working on I’ll
+illustrate the problem setup with a (possibly) imaginary scenario.&lt;/p&gt;
+&lt;p&gt;Let’s imagine we’re working for a credit card company. We issue credit cards to
+consumers who go and spend money at different businesses. Knowing the monthly
+revenue those business generate can be instrumental for pricing and marketing
+purposes.&lt;/p&gt;
+&lt;p&gt;To try and estimate business monthly revenue we asked a
+small subset of the businesses to disclose their last month
+revenue. We’ll denote the last month revenue for business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt; by &lt;span class=&#34;math inline&#34;&gt;\(y_i\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;Next, we have at our disposal purchase information from our credit card holders.
+Let’s denote the total money spent by customer &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt; at business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt; by &lt;span class=&#34;math inline&#34;&gt;\(x_{ij}\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;We can assume that the total purchases by our credit card holders at a given
+business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt;: &lt;span class=&#34;math inline&#34;&gt;\(x_i=\Sigma x_{ij}\)&lt;/span&gt; represents only a fraction of the total revenue
+&lt;span class=&#34;math inline&#34;&gt;\(y_i\)&lt;/span&gt;. We can thus assume that there’s some inflation factor &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; such that:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[y_i = x_i \beta + \epsilon_i\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Estimation of &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; would amount to a simple regression. We can then use the
+model to estimate monthly revenue for all the other businesses where our card
+holders are spending money.&lt;/p&gt;
+&lt;p&gt;Taking the above idea one step further, we can imagine that different card
+holders might represent very different purchasing patterns, which could
+necessitate different inflation factor &lt;span class=&#34;math inline&#34;&gt;\(\beta_j\)&lt;/span&gt; for every consumer &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt;.
+This would amount to assuming that:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[y_i = \Sigma x_{ij}\beta_j + \epsilon_i\]&lt;/span&gt;
+and in matrix notation:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[Y=X\beta + \epsilon\]&lt;/span&gt;
+Estimation of the above equation might seem like a simple regression but in
+practice it introduces several challenges:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is usually very large. It would span as many rows as we have businesses
+in our sample and as many columns as the number of credit card holders. In my
+application I had 70K rows on 1.8M columns (which roughly translates to 470 GB
+assuming we encode the matrix entries as integer).&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; can have many more columns than it has rows. This kind of matrix is
+&lt;a href=&#34;https://en.wikipedia.org/wiki/Rank_(linear_algebra)#:~:text=%20A%20matrix%20is%20said%20to%20be%20rank%2Deficient%20if%20it,given%20by%20mult%20iplication%20by%20A.&#34;&gt;rank defiecient&lt;/a&gt; which in practice means we can’t calculate the closed
+form solution (there’s actually infinite solutions).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;div id=&#34;sparse-linear-regression-in-scala-spark&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Sparse linear regression in scala spark&lt;/h2&gt;
+&lt;p&gt;Luckily enough Spark Scala has all the tools needed to tackle the above problem
+at scale!&lt;/p&gt;
+&lt;p&gt;First, we note that while &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is pretty huge, it’s also usually very sparse. In
+my application it had the value 0 in 99.95% of it’s entries. That means we can use sparse
+matrix representation to avoid blowing up our memory.&lt;/p&gt;
+&lt;p&gt;Next, we discover that the spark ml linear regression implementation can fit
+the model using gradient descent rather than using the closed form solution.
+This means we can solve the above optimization problem and arrive at one (of
+infinite) solutions to the equation.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;code-receipe&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Code receipe&lt;/h2&gt;
+&lt;p&gt;Note: The below assumes spark 3.0+&lt;/p&gt;
+&lt;p&gt;A reasonable place to start our code example is to assume we have some
+transnational DataFrame &lt;em&gt;user_df&lt;/em&gt; for a given month with the following schema:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;user_id: StringType&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;business_id: IntegerType&lt;/li&gt;
+&lt;li&gt;amount_spent: DoubleType&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import spark.implicits._
+
+val user_df = Seq(
+  (&amp;quot;ad3a&amp;quot;, 1, 14.0), 
+  (&amp;quot;ad3a&amp;quot;, 0, 13.0), 
+  (&amp;quot;3Gd2e&amp;quot;, 1, 11.0)
+).toDF(&amp;quot;user_id&amp;quot;, &amp;quot;business_id&amp;quot;, &amp;quot;amount_spent&amp;quot;)
+
+user_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-------+-----------+------------+
+## |user_id|business_id|amount_spent|
+## +-------+-----------+------------+
+## |   ad3a|          1|        14.0|
+## |   ad3a|          0|        13.0|
+## |  3Gd2e|          1|        11.0|
+## +-------+-----------+------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We also have a DataFrame containing a sample of businesses total revenues
+&lt;em&gt;biz_df&lt;/em&gt;:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;business_id: IntegerType&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;total_revenue: FloatType&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;val biz_df = Seq(
+  (0, 13.9), 
+  (1, 36.7)
+).toDF(&amp;quot;business_id&amp;quot;, &amp;quot;total_revenue&amp;quot;)
+
+biz_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----------+-------------+
+## |business_id|total_revenue|
+## +-----------+-------------+
+## |          0|         13.9|
+## |          1|         36.7|
+## +-----------+-------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s start with some preprocesssing in the &lt;em&gt;user_df&lt;/em&gt; DataFrame. First, we need
+to convert &lt;em&gt;user_id&lt;/em&gt;s to column index in the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; matrix. This means every user
+needs to have an integer denoting the matrix column index that represents his
+spending. Spark has a great utility that can serve that purpose: &lt;em&gt;StringIndexer&lt;/em&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.feature.StringIndexer
+val stringIndexer = new StringIndexer()
+.setInputCol(&amp;quot;user_id&amp;quot;)
+.setOutputCol(&amp;quot;userIndex&amp;quot;)
+
+val stringIndexerModel = stringIndexer.fit(user_df)
+
+user_df = stringIndexerModel
+.transform(user_df)
+.withColumn(&amp;quot;userIndex&amp;quot;, $&amp;quot;userIndex&amp;quot;.cast(&amp;quot;Int&amp;quot;))
+
+user_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-------+-----------+------------+---------+
+## |user_id|business_id|amount_spent|userIndex|
+## +-------+-----------+------------+---------+
+## |   ad3a|          1|        14.0|        0|
+## |   ad3a|          0|        13.0|        0|
+## |  3Gd2e|          1|        11.0|        1|
+## +-------+-----------+------------+---------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next, we’ll collect for every business the users who spent money with them and
+the corresponding amounts. In the below code we’ll also join in the business total revenue too:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions._
+val sortUdf: UserDefinedFunction = udf((rows: Seq[Row]) =&amp;gt; {
+  rows.map { case Row(userIndex: Int, amount_spent: Double) =&amp;gt; (userIndex, amount_spent) }
+    .sortBy { case (userIndex, amount_spent) =&amp;gt; userIndex }
+})
+
+
+val user_business_amount_spent_df = user_df
+.groupBy(&amp;quot;business_id&amp;quot;)
+.agg(collect_list(struct(&amp;quot;userIndex&amp;quot;, &amp;quot;amount_spent&amp;quot;)).alias(&amp;quot;user_amount_spent_list&amp;quot;))
+.select($&amp;quot;business_id&amp;quot;, sortUdf($&amp;quot;user_amount_spent_list&amp;quot;).alias(&amp;quot;user_amount_spent_list&amp;quot;))
+.withColumn(&amp;quot;userIndex_list&amp;quot;, $&amp;quot;user_amount_spent_list&amp;quot;.getField(&amp;quot;_1&amp;quot;))
+.withColumn(&amp;quot;amount_spent_list&amp;quot;, $&amp;quot;user_amount_spent_list&amp;quot;.getField(&amp;quot;_2&amp;quot;))
+.drop(&amp;quot;user_amount_spent_list&amp;quot;)
+.join(biz_df, &amp;quot;business_id&amp;quot;)
+
+user_business_amount_spent_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----------+--------------+-----------------+-------------+
+## |business_id|userIndex_list|amount_spent_list|total_revenue|
+## +-----------+--------------+-----------------+-------------+
+## |          1|        [0, 1]|     [14.0, 11.0]|         36.7|
+## |          0|           [0]|           [13.0]|         13.9|
+## +-----------+--------------+-----------------+-------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Note that we use the UDF above to ensure user user indices are in ascending
+order as the &lt;em&gt;collect_list&lt;/em&gt; function does not ensure any specific ordering.&lt;/p&gt;
+&lt;p&gt;Now, all there’s left to do is represent every row as a sparse vector and
+it’s corresponding label. I’ve also created a small case class that retains
+the &lt;em&gt;business_id&lt;/em&gt; identifier:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.linalg.SparseVector
+case class LabeledPoint2(label: Double, features: SparseVector, business: Int)
+val num_columns = stringIndexerModel.labelsArray.size + 1
+val sparse_user_business_amount_spent_df = user_business_amount_spent_df
+.map(r =&amp;gt; LabeledPoint2(r.getDouble(3), 
+                       new SparseVector(size = num_columns, 
+                                        indices = r.getAs[Seq[Int]](&amp;quot;userIndex_list&amp;quot;).toArray, 
+                                        values = r.getAs[Seq[Double]](&amp;quot;amount_spent_list&amp;quot;).toArray), 
+                       r.getInt(0)))
+
+sparse_user_business_amount_spent_df.show(truncate=false)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----+---------------------+--------+
+## |label|features             |business|
+## +-----+---------------------+--------+
+## |36.7 |(2,[0,1],[14.0,11.0])|1       |
+## |13.9 |(2,[0],[13.0])       |0       |
+## +-----+---------------------+--------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and voila - there you have it - our matrix is encoded sparsely, enabling us
+to conveniently store it in memory and fitting to it all models available in spark
+ml in a scalable manner! In my application fitting a linear regression took
+20-30 minutes.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.regression.LinearRegression
+val lr = new LinearRegression()
+.setFitIntercept(false)
+
+val lrModel = lr.fit(sparse_user_business_amount_spent_df)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see our regression arrived at the correct betas (1,2):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;lrModel.coefficients&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;org.apache.spark.ml.linalg.Vector = [1.0692307692307697,1.9755244755244754]&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;One interesting fact about the above problem setup is that since it has more
+columns than rows it fits the training data perfectly (resulting in 0 training
+error).
+While this usually indicates overfitting, the above model performs pretty well
+in my application. This probably has to do with a phenomenon called “double descent
+risk curve”. More on that on my next post!&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>dtplyr speed benchmarks</title>
+      <link>https://iyarlin.github.io/2020/05/26/dtplyr_benchmarks/</link>
+      <pubDate>Tue, 26 May 2020 00:00:00 +0000</pubDate>
+      
+      <guid>https://iyarlin.github.io/2020/05/26/dtplyr_benchmarks/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/tdplyr_benchmarking_files/race_cars.jpg&#34; width=&#34;450&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;R has many great tools for data wrangling. Two of those are the &lt;em&gt;dplyr&lt;/em&gt; and &lt;em&gt;data.table&lt;/em&gt; packages. When people wonder which one should they learn it is often argued that &lt;em&gt;dplyr&lt;/em&gt; is considerably slower compared with &lt;em&gt;data.table&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;Granted, &lt;em&gt;data.table&lt;/em&gt; is blazing fast, but I personally find the syntax hard and un-intuitive and the speed difference doesn’t make much of a difference in most use cases I encountered.&lt;/p&gt;
 &lt;p&gt;The only frequent scenario where I’ve experienced a significant performance gap is when doing operations over a very large number of groups. This can happen when for example working with customer data, where each row describes a touch point or transaction and one is interested with calculating the number of rows per customer, monetary value of all transactions per customer etc.&lt;/p&gt;
@@ -251,7 +469,7 @@ dplyr_results &amp;lt;- list(
 )&lt;/code&gt;&lt;/pre&gt;
 &lt;/p&gt;
 &lt;/details&gt;
-&lt;p&gt;&lt;img src=&#34;/post/tdplyr_benchmarking_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;480&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/tdplyr_benchmarking_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;480&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that using &lt;em&gt;dtplyr&lt;/em&gt; improves the performance quite a bit, though still not as fast as &lt;em&gt;data.table&lt;/em&gt;. It would seem however that most of the difference stems from the need to convert the &lt;code&gt;data.frame&lt;/code&gt; object to a &lt;code&gt;data.table&lt;/code&gt; one. That can be done once when reading in the file for example. Thus it would seem that ultimately the sacrifice in performance for the added benefit of tidy syntax (for those who dig tidy) isn’t too bad.&lt;/p&gt;
 &lt;p&gt;Personally, I’m hooked on the tidyverse and the &lt;em&gt;dtplyr&lt;/em&gt; package is just another reason to keep using it, even for operations over a large number of groups.&lt;/p&gt;
 &lt;div id=&#34;session-info&#34; class=&#34;section level2&#34;&gt;
@@ -298,14 +516,14 @@ dplyr_results &amp;lt;- list(
     
     <item>
       <title>dowhy library exploration</title>
-      <link>/2020/04/20/dowhy_exploration/</link>
+      <link>https://iyarlin.github.io/2020/04/20/dowhy_exploration/</link>
       <pubDate>Mon, 20 Apr 2020 00:00:00 +0000</pubDate>
       
-      <guid>/2020/04/20/dowhy_exploration/</guid>
+      <guid>https://iyarlin.github.io/2020/04/20/dowhy_exploration/</guid>
       <description>
 
 
-&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/reticulated_python.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dowhy_exploration_files/reticulated_python.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;It is not often that I find myself thinking “man, I wish we had in R that cool python library!”. That is however the case with the &lt;a href=&#34;https://microsoft.github.io/dowhy/&#34;&gt;&lt;em&gt;dowhy&lt;/em&gt;&lt;/a&gt; library which “provides a unified interface for causal inference methods and automatically tests many assumptions, thus making inference accessible to non-experts”.&lt;/p&gt;
 &lt;p&gt;Luckily enough though, the awesome folks at Rstudio have written the &lt;a href=&#34;https://rstudio.github.io/reticulate/&#34;&gt;&lt;em&gt;reticulate&lt;/em&gt;&lt;/a&gt; package just for that sort of occasion: It “provides a comprehensive set of tools for interoperability between Python and R”.&lt;/p&gt;
 &lt;p&gt;In this post I’ll set about exploring the &lt;em&gt;dowhy&lt;/em&gt; library while never leaving my Rstudio IDE or even writing python code!&lt;/p&gt;
@@ -443,7 +661,7 @@ coordinates(dagitty_graph) &amp;lt;- list(
 
 ggdag(tidy_dagitty(dagitty_graph)) + theme_dag_blank() + 
   annotate(geom = &amp;quot;text&amp;quot;, x = 0, y = 0.3, label = &amp;quot;Unobserved \n confounders&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dowhy_exploration_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We enumerate the causal model using the following code:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;model &amp;lt;- dowhy$CausalModel(
   data = data[[&amp;quot;df&amp;quot;]],
@@ -626,7 +844,7 @@ data.frame(causal_estimate = res) %&amp;gt;%
     label = paste0(&amp;quot;SD = &amp;quot;, res_sd),
     color = &amp;quot;red&amp;quot;, size = 6
   )&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/dowhy_exploration_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dowhy_exploration_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Oddly enough it would seem the estimate is pretty far off from 10.&lt;/p&gt;
 &lt;p&gt;The code above demonstrates how &lt;em&gt;reticulate&lt;/em&gt; enables seamless simultaneous coding in Python and R.&lt;/p&gt;
 &lt;/div&gt;
@@ -635,14 +853,14 @@ data.frame(causal_estimate = res) %&amp;gt;%
     
     <item>
       <title>Automatic DAG learning - part 2</title>
-      <link>/2020/01/21/automatic_dag_learning_part_2/</link>
+      <link>https://iyarlin.github.io/2020/01/21/automatic_dag_learning_part_2/</link>
       <pubDate>Tue, 21 Jan 2020 00:00:00 +0000</pubDate>
       
-      <guid>/2020/01/21/automatic_dag_learning_part_2/</guid>
+      <guid>https://iyarlin.github.io/2020/01/21/automatic_dag_learning_part_2/</guid>
       <description>
 
 
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/orientDAGhex.png&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/orientDAGhex.png&#34; /&gt;&lt;/p&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Intro&lt;/h1&gt;
 &lt;p&gt;We’ve seen on a previous &lt;a href=&#34;https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/&#34;&gt;post&lt;/a&gt; that one of the main differences between classic ML and Causal Inference is the additional step of using the correct adjustment set for the predictor features.&lt;/p&gt;
@@ -659,7 +877,7 @@ data.frame(causal_estimate = res) %&amp;gt;%
 &lt;p&gt;When either X or Y are discrete, and the other is continuous we can discretisize the continuous variable (using for example the procedure at &lt;em&gt;infotheo::discretize&lt;/em&gt;) and use the method for 2 discrete variables mentioned above.&lt;/p&gt;
 &lt;p&gt;The &lt;a href=&#34;https://github.com/IyarLin/orientDAG&#34;&gt;orientDAG&lt;/a&gt; package uses the approach outlined above to orient DAG skeleton edges. To demonstrate how it works let’s go back to the example shown on my last post.&lt;/p&gt;
 &lt;p&gt;We used the &lt;a href=&#34;https://github.com/IyarLin/simMixedDAG&#34;&gt;simMixedDAG&lt;/a&gt; package to simulate datasets from the DAG below:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Following the bench-marking results on my last post we’ll restrict our attention to the &lt;em&gt;bnlearn::tabu&lt;/em&gt; function for learning the DAG skeleton.&lt;/p&gt;
 &lt;p&gt;The main function in the orientDAG is fittingly called &lt;code&gt;orient_dag&lt;/code&gt;. It takes as input an adjacency matrix where a 1 in the i,j position denotes an arrow from node i to node j.&lt;/p&gt;
 &lt;p&gt;Below we can see the adjacency matrix corresponding to the DAG above:&lt;/p&gt;
@@ -673,7 +891,7 @@ data.frame(causal_estimate = res) %&amp;gt;%
 ## vocab        0        0    0         0      1          0     0    1
 ## year         0        0    0         0      0          0     0    0&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;The package also contains utility functions that facilitate DAG conversion between different representations. We can thus take the fitted &lt;em&gt;bn&lt;/em&gt; DAG object from the &lt;em&gt;tabu&lt;/em&gt; function and convert it to an adjacency matrix using the function &lt;code&gt;bn_to_adjmatrix&lt;/code&gt;. The DAG below shows all conversions available in the package:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-3-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;As before, we’ll measure DAG learning accuracy by the &lt;a href=&#34;https://arxiv.org/abs/1306.1043&#34;&gt;Structural Intervention Distance&lt;/a&gt;. For every sample size &lt;span class=&#34;math inline&#34;&gt;\(n\)&lt;/span&gt; I simulate 100 datasets and measure SID. Below I compare the SID distribution for 3 algorithms:&lt;/p&gt;
 &lt;ol style=&#34;list-style-type: decimal&#34;&gt;
 &lt;li&gt;&lt;em&gt;tabu&lt;/em&gt;: DAGs obtained using the &lt;em&gt;tabu&lt;/em&gt; function from the &lt;em&gt;bnlearn&lt;/em&gt; package&lt;br /&gt;
@@ -682,12 +900,12 @@ data.frame(causal_estimate = res) %&amp;gt;%
 &lt;/li&gt;
 &lt;li&gt;&lt;em&gt;random&lt;/em&gt;: DAGs obtained by randomly re-orienting the DAGs obtained by the &lt;em&gt;tabu&lt;/em&gt; function&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the &lt;em&gt;tabu&lt;/em&gt; performance deteriorates as sample size grows while &lt;em&gt;tabu + orientDAG&lt;/em&gt; improves.&lt;/p&gt;
 &lt;p&gt;From SID we can derive a more intuitive measure: The probability of finding the correct adjustment set for a randomly chosen pair of treatment-exposure variables:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[P(\text{correct adj set)} = 1 - \frac{SID}{\#\{\text{possible treatment - exposure pairs}\}}\]&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;Below we can see the corresponding plot:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;For &lt;span class=&#34;math inline&#34;&gt;\(n = 80,000\)&lt;/span&gt; the &lt;em&gt;orientDAG&lt;/em&gt; package about doubles the performance compared with &lt;em&gt;tabu&lt;/em&gt;.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;bayesian-network-dgp&#34; class=&#34;section level1&#34;&gt;
@@ -695,14 +913,14 @@ data.frame(causal_estimate = res) %&amp;gt;%
 &lt;p&gt;In the above example the underlying data generating process (DGP) didn’t conform to the Bayesian Network (BN) assumptions, which might explain the deteriorating performance of the &lt;em&gt;tabu&lt;/em&gt; function.&lt;/p&gt;
 &lt;p&gt;Let’s see how the different algorithms fare when the underlying DGP does conform to the BN assumptions.&lt;/p&gt;
 &lt;p&gt;Below I plot the “mehra” DAG taken from the bnlearn package:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The above DAG contains 24 nodes, of which 8 are categorical. The nodes are connected by 71 arrows.&lt;/p&gt;
 &lt;p&gt;Below we can see SID for the different algorithms (this time running only 10 simulations per sample size due to the network size):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can now see that when the BN assumptions hold the &lt;em&gt;tabu&lt;/em&gt; function fares best as expected, while the &lt;em&gt;tabu + orientDAG&lt;/em&gt; fares as bad as a random guess or even worse. It’s possible that the &lt;em&gt;tabu + orientDAG&lt;/em&gt; performance is worse because it uses tests unrelated to the BN assumptions thus introducing noise to edges which are already oriented correctly by &lt;em&gt;tabu&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;We can mitigate such performance deterioration by introducing regularization parameters which force &lt;code&gt;orient_dag&lt;/code&gt; to re-orient an edge only in cases where there is strong evidence for a given orientation. Namely, the difference between distance correlation/generalized correlations must exceed some threshold. We’ll call this approach &lt;em&gt;tabu + orientDAG - conservative&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;Below we can see the resulting performance measures:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_2_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;While the &lt;em&gt;tabu + orientDAG&lt;/em&gt; still fares worse then &lt;em&gt;tabu&lt;/em&gt;, it still is able to marginally at least outperform a random guess.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;conclusion&#34; class=&#34;section level1&#34;&gt;
@@ -715,14 +933,14 @@ data.frame(causal_estimate = res) %&amp;gt;%
     
     <item>
       <title>Automatic DAG learning - part 1</title>
-      <link>/2019/10/17/automatic_dag_learning_part_1/</link>
+      <link>https://iyarlin.github.io/2019/10/17/automatic_dag_learning_part_1/</link>
       <pubDate>Thu, 17 Oct 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/10/17/automatic_dag_learning_part_1/</guid>
+      <guid>https://iyarlin.github.io/2019/10/17/automatic_dag_learning_part_1/</guid>
       <description>
 
 
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/Dag-score.jpg&#34; width=&#34;650&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/Dag-score.jpg&#34; width=&#34;650&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;I was really struggling with finding a header pic for this post when I came across the one above - titled &lt;a href=&#34;https://www.google.com/search?q=dag&amp;amp;sxsrf=ACYBGNSbNuRo9RIXip-5aOAMO3qcPF0cmg:1571232790582&amp;amp;source=lnms&amp;amp;tbm=isch&amp;amp;sa=X&amp;amp;ved=0ahUKEwjb6d2i8qDlAhWKOcAKHSfGBiwQ_AUIEigB&amp;amp;biw=1680&amp;amp;bih=890&amp;amp;dpr=2#imgrc=g90lBqR0P6M8DM:&#34;&gt;“Dag scoring and selection”&lt;/a&gt; and since it’s sort of the topic of this post I decided to use it!&lt;/p&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Intro&lt;/h1&gt;
@@ -741,7 +959,7 @@ data.frame(causal_estimate = res) %&amp;gt;%
 &lt;h1&gt;Existing methods for learning DAGs&lt;/h1&gt;
 &lt;p&gt;R has tons of packages for DAG estimation. Fortunately, the &lt;a href=&#34;https://annehpetersen.shinyapps.io/causalDisco/&#34;&gt;causalDisco&lt;/a&gt; is a great shiny app that enables searching DAG estimation functions using different criteria.&lt;/p&gt;
 &lt;p&gt;In this post I’ll restrict the discussion to the scenario where there are no hidden confounders and where the dataset contains both discrete (i.e. categorical) and numeric variables. We’d also like our estimation function to output a DAG with all edges oriented. Below we can see the results of applying these conditions in the causalDisco app:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/Screen%20Shot%202019-10-17%20at%209.01.40.png&#34; width=&#34;600&#34; height=&#34;550&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/Screen%20Shot%202019-10-17%20at%209.01.40.png&#34; width=&#34;600&#34; height=&#34;550&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We get the following list: &lt;em&gt;bnlearn::hc&lt;/em&gt;, &lt;em&gt;bnlearn::tabu&lt;/em&gt;, &lt;em&gt;bnlearn::mmhc&lt;/em&gt;, &lt;em&gt;bnlearn::rsmax2&lt;/em&gt;, &lt;em&gt;deal::autosearch&lt;/em&gt; and &lt;em&gt;deal::heuristic&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;After playing around a bit with the &lt;em&gt;deal&lt;/em&gt; functions I found they were too manual for a quick algorithm comparison. I’ve thus decided to use only the &lt;em&gt;bnlearn&lt;/em&gt; functions.&lt;/p&gt;
 &lt;/div&gt;
@@ -752,7 +970,7 @@ data.frame(causal_estimate = res) %&amp;gt;%
 &lt;h2&gt;Edge distance&lt;/h2&gt;
 &lt;p&gt;A simple way to measure estimated DAG dissimilarity with the true DAG would be to count how many edges are present in the true DAG yet missing in the estimated DAG and conversely, how many edges are present in the estimated DAG yet do not exist in the true DAG.&lt;/p&gt;
 &lt;p&gt;Let’s take as an example the DAG presented on my &lt;a href=&#34;https://iyarlin.github.io/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/&#34;&gt;last post&lt;/a&gt; (presented on the left), along with an estimated DAG (on the right):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see in the above example that in the estimated DAG there’s an edge &lt;span class=&#34;math inline&#34;&gt;\(gender \rightarrow ageGroup\)&lt;/span&gt; which doesn’t exist in the true DAG, and that it’s missing the edge &lt;span class=&#34;math inline&#34;&gt;\(nativeBorn \rightarrow educ\)&lt;/span&gt;. So the edge distance this case is 2.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;hamming-distance&#34; class=&#34;section level2&#34;&gt;
@@ -904,25 +1122,25 @@ Qu. = 59, Max. = 89&lt;/td&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;We’ll assume throughout the example that the following is the true DAG:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The DGP will be constructed using the &lt;em&gt;non_parametric_dag_model&lt;/em&gt; function from &lt;em&gt;simMixedDAG&lt;/em&gt;.&lt;/p&gt;
 &lt;p&gt;For every algorithm and sample size we simulate 200 datasets and measure the estimated DAG accuracy.&lt;/p&gt;
 &lt;p&gt;Below we can see the average simulation results for the edge distance measure for different samples sizes:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-8-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the algorithm performance is comparable up to around 27360 observations, after which &lt;em&gt;mmhc&lt;/em&gt; and &lt;em&gt;rsmax2&lt;/em&gt; flatten out while &lt;em&gt;hc&lt;/em&gt; and &lt;em&gt;tabu&lt;/em&gt; approach perfect estimation of the DAG skeleton.&lt;/p&gt;
 &lt;p&gt;Below we can see the average simulation results for the Hamming distance measure:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-9-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that pretty fast all algorithms hit a performance plateau at around 6.&lt;/p&gt;
 &lt;p&gt;When it comes to Structural Intervention Distance things look even worse:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Let’s revisit that last one with error bars just for mmhc:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the performance is essentially unchanged across different sample sizes (all confidence intervals overlap).&lt;/p&gt;
 &lt;p&gt;To get a sense of what different SID scores mean, we can calculate the probability of finding the correct adjustment set given a random selection of a treatment and control pair using the following equation:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[P(\text{correct adj set)} = 1 - \frac{SID}{\#\{\text{possible treatment - exposure pairs}\}}\]&lt;/span&gt;
 In our case given there are 8 nodes we have &lt;span class=&#34;math inline&#34;&gt;\(\#\{\text{possible treatment - exposure pairs}\} = 8 \cdot 7 = 56\)&lt;/span&gt;.&lt;/p&gt;
 &lt;p&gt;Below is the resulting graph:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/automatic_DAG_learning_part_1_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Pretty abysmal.&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;summary&#34; class=&#34;section level1&#34;&gt;
@@ -938,14 +1156,14 @@ In our case given there are 8 nodes we have &lt;span class=&#34;math inline&#34;
     
     <item>
       <title>&#34;Real life&#34; DAG simulation using the simMixedDAG package</title>
-      <link>/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</link>
+      <link>https://iyarlin.github.io/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</link>
       <pubDate>Tue, 23 Jul 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</guid>
+      <guid>https://iyarlin.github.io/2019/07/23/mixed_dag_simulation_using_simmixeddag_package/</guid>
       <description>
 
 
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/simMixedDAGhex.png&#34; width=&#34;380&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/simMixedDAGhex.png&#34; width=&#34;380&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;Intro&lt;/h1&gt;
 &lt;p&gt;I’ve discussed on several blog posts how Causal Inference involves making inference about unobserved quantities and distributions (e.g. we never observe &lt;span class=&#34;math inline&#34;&gt;\(Y|do(x)\)&lt;/span&gt;). That means we can’t benchmark different algorithms on Causal Inference tasks (e.g &lt;span class=&#34;math inline&#34;&gt;\(ATE/CATE\)&lt;/span&gt; estimation) the same way we do in ML because we don’t have any ground truth to benchmark against.&lt;/p&gt;
@@ -976,7 +1194,7 @@ In our case given there are 8 nodes we have &lt;span class=&#34;math inline&#34;
 &lt;h2&gt;Fitting and simulating a non paramateric DAG - an example&lt;/h2&gt;
 &lt;p&gt;In this example we’ll use the &lt;a href=&#34;https://vincentarelbundock.github.io/Rdatasets/doc/carData/GSSvocab.html&#34;&gt;General Social Survey&lt;/a&gt; dataset.&lt;/p&gt;
 &lt;p&gt;We’ll assume the following DAG for a subset of the variables:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The following piece of code fits the smoothing functions &lt;span class=&#34;math inline&#34;&gt;\(s_{ij}(x_i)\)&lt;/span&gt; and stores them in an object of class “non_parametric_dag_model”:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;non_param_dag_model &amp;lt;-
   non_parametric_dag_model(
@@ -990,10 +1208,10 @@ In our case given there are 8 nodes we have &lt;span class=&#34;math inline&#34;
     N = 30000
   )&lt;/code&gt;&lt;/pre&gt;
 &lt;p&gt;We can verify that indeed the original distributions are mostly preserved in the simulated dataset:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-5-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-6-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We notice vocab on the original dataset was constrained to the integers 0-10, while in the simulated dataset it was transformed to continuous with some values extending beyond the 0-10 range.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-7-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;table style=&#34;width:43%;&#34;&gt;
 &lt;caption&gt;Original data&lt;/caption&gt;
 &lt;colgroup&gt;
@@ -1058,7 +1276,7 @@ where &lt;span class=&#34;math inline&#34;&gt;\(lp\)&lt;/span&gt; is the linear 
 &lt;div id=&#34;specifying-and-simulating-a-paramateric-dag---an-example&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;Specifying and simulating a paramateric DAG - an example&lt;/h2&gt;
 &lt;p&gt;In this example we’ll use the DAG presented on my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;first post&lt;/a&gt;:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/plot%20dag-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/plot%20dag-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;In the next few lines I specify a simple parametric DAG model with all Gaussian nodes and simulate a dataset from that model:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(2)
 param_dag_model &amp;lt;- parametric_dag_model(dag = g)
@@ -1066,7 +1284,7 @@ sim_data &amp;lt;- sim_mixed_dag(dag_model = param_dag_model,
                           N = 500)
 sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
   stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-10-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;In the code above we didn’t specify what the &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; coefficients are. Those are thus drawn from a standard normal distribution.&lt;/p&gt;
 &lt;p&gt;We can manually set beta coefficients by providing an additional &lt;code&gt;f.args&lt;/code&gt; argument as follows:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
@@ -1078,7 +1296,7 @@ param_dag_model &amp;lt;-
 sim_data &amp;lt;- sim_mixed_dag(param_dag_model, N = 500)
 sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
   stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-11-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can set how noisy the errors are using the &lt;code&gt;sinr&lt;/code&gt; (signal to noise ratio) argument:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
 param_dag_model &amp;lt;-
@@ -1091,7 +1309,7 @@ sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
 
 sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
   stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-12-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can tweak the &lt;span class=&#34;math inline&#34;&gt;\(f\)&lt;/span&gt; functions to include a link function &lt;span class=&#34;math inline&#34;&gt;\(g\)&lt;/span&gt;:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = g(lp) + \epsilon_j\]&lt;/span&gt;&lt;/p&gt;
 &lt;p&gt;Below I apply a “cosin” link function using the &lt;code&gt;link&lt;/code&gt; argument:&lt;/p&gt;
@@ -1108,7 +1326,7 @@ sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
 
 sim_data %&amp;gt;% ggplot(aes(comp, sales)) + geom_point() +
   stat_smooth()&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-13-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Below are 2 more link functions implemented:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;set.seed(1)
 param_dag_model &amp;lt;-
@@ -1142,7 +1360,7 @@ p2 &amp;lt;- sim_data %&amp;gt;% ggplot(aes(comp, sales)) +
   theme(plot.title = element_text(hjust = 0.5))
 
 grid.arrange(p1, p2, nrow = 1)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-14-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We introduce categorical variables with &lt;span class=&#34;math inline&#34;&gt;\(M\)&lt;/span&gt; levels via the following transformation:&lt;/p&gt;
 &lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[f_j(PA_j) = cat(g(lp) + \epsilon_j)\]&lt;/span&gt;
 where we have:&lt;/p&gt;
@@ -1168,7 +1386,7 @@ sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
 
 sim_data %&amp;gt;% ggplot(aes(sales, comp)) + geom_boxplot() +
   stat_smooth()&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-15-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;It’s important to note that any non-specified arguments in &lt;code&gt;f.args&lt;/code&gt; are filled in from default values.&lt;/p&gt;
 &lt;/div&gt;
 &lt;/div&gt;
@@ -1178,7 +1396,7 @@ sim_data %&amp;gt;% ggplot(aes(sales, comp)) + geom_boxplot() +
 &lt;p&gt;For simple DAG models the analytic calculation of the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; is pretty simple (e.g. continuous Gaussian distributed, no interactions etc). When simulating from more complex models (e.g. parametric with link functions, non parametric models) deriving the ATE analytically might become more challenging.&lt;/p&gt;
 &lt;p&gt;One way to obtain the true &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; given a DAG model is to use simulation analysis. Consider for instance the problem setup discussed on my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;first post&lt;/a&gt; where we calculated analytically that the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; of mkt on sales was 0.15.&lt;/p&gt;
 &lt;p&gt;We know that the relation of &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; to &lt;span class=&#34;math inline&#34;&gt;\(sales\)&lt;/span&gt; is confounded by the &lt;span class=&#34;math inline&#34;&gt;\(comp\)&lt;/span&gt; variable. When setting &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; to some value (AKA &lt;span class=&#34;math inline&#34;&gt;\(do(mkt)\)&lt;/span&gt;) we remove the arrow that points from &lt;span class=&#34;math inline&#34;&gt;\(comp\)&lt;/span&gt; to &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; (like in the DAG below):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-16-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The above operation of removing all arrows pointing into the treatment variable is also called “graph surgery” (See Pearl’s “Causal Inference in Statistics - A Primer” chapter 3).&lt;/p&gt;
 &lt;p&gt;When observing the by-variate relation in the non-confounded dataset simulated from the DAG above we can see the true effect of &lt;span class=&#34;math inline&#34;&gt;\(mkt\)&lt;/span&gt; on &lt;span class=&#34;math inline&#34;&gt;\(sales\)&lt;/span&gt;:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;-
@@ -1192,7 +1410,7 @@ sim_data %&amp;gt;% ggplot(aes(sales, comp)) + geom_boxplot() +
 sim_data &amp;lt;- sim_mixed_dag(param_dag_model)
 sim_data %&amp;gt;% ggplot(aes(mkt, sales)) + geom_point() +
   stat_smooth(method = &amp;quot;lm&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;&lt;img src=&#34;/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-17-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sim_mixed_dag_with_simMixedDAG_files/figure-html/unnamed-chunk-17-1.png&#34; width=&#34;576&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;The &lt;code&gt;get_ate&lt;/code&gt; function implements the same logic under the hood to calculate the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; for any &lt;code&gt;dag_model&lt;/code&gt;. Below we demonstrate using the following code:&lt;/p&gt;
 &lt;pre class=&#34;r&#34;&gt;&lt;code&gt;param_dag_model &amp;lt;-
   parametric_dag_model(dag = g, f.args = list(
@@ -1410,15 +1628,15 @@ pandoc.table(educ_ate_on_vocab,
     
     <item>
       <title>My 2 cents on the &#34;R vs Python&#34; squabble</title>
-      <link>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</link>
+      <link>https://iyarlin.github.io/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</link>
       <pubDate>Thu, 11 Jul 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</guid>
+      <guid>https://iyarlin.github.io/2019/07/11/my_2_cents_on_the_r_vs_python_squabble/</guid>
       <description>
 
 
 &lt;div class=&#34;figure&#34;&gt;
-&lt;img src=&#34;/post/my_2_cents_on_the_R_vs_Python_squabble_files/SaboriAv_Web.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;
+&lt;img src=&#34;https://iyarlin.github.io/post/my_2_cents_on_the_R_vs_Python_squabble_files/SaboriAv_Web.png&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;
 
 &lt;/div&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
@@ -1454,15 +1672,15 @@ pandoc.table(educ_ate_on_vocab,
     
     <item>
       <title>Causal inference bake off (Kaggle style!)</title>
-      <link>/2019/05/20/causal-inference-bake-off-kaggle-style/</link>
+      <link>https://iyarlin.github.io/2019/05/20/causal-inference-bake-off-kaggle-style/</link>
       <pubDate>Mon, 20 May 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/05/20/causal-inference-bake-off-kaggle-style/</guid>
+      <guid>https://iyarlin.github.io/2019/05/20/causal-inference-bake-off-kaggle-style/</guid>
       <description>
 
 
 &lt;div class=&#34;figure&#34;&gt;
-&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/target.jpg&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;
+&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/target.jpg&#34; width=&#34;600&#34; height=&#34;300&#34; /&gt;
 
 &lt;/div&gt;
 &lt;div id=&#34;intro&#34; class=&#34;section level1&#34;&gt;
@@ -1530,7 +1748,7 @@ pandoc.table(educ_ate_on_vocab,
 &lt;p&gt;In order to use the g-computation formula we need to identify the correct adjustment set &lt;span class=&#34;math inline&#34;&gt;\(Z_B\)&lt;/span&gt;.&lt;/p&gt;
 &lt;p&gt;After talking to some of our customers we learn that large companies usually employ large teams of analysts to optimize their campaigns, resulting in higher ROI compared with smaller companies. Having those large teams also means they have lower tendency to run our trial compared with small companies.&lt;/p&gt;
 &lt;p&gt;We thus assume the following DAG:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20dag-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20dag-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Applying the “Backdoor criteria” to the DAG above we arrive at the insight that company size is a confounding factor and thus &lt;span class=&#34;math inline&#34;&gt;\(Z_B = \text{company size}\)&lt;/span&gt;. The g-computation formula reads in our case:&lt;/p&gt;
 &lt;span class=&#34;math display&#34;&gt;\[\begin{equation}
 \mathbb{E}(\text{ROI}|do(\text{treatment})) = \\ 
@@ -1659,9 +1877,9 @@ pandoc.table(educ_ate_on_vocab,
 &lt;div id=&#34;an-example-with-simulated-data&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;An example with simulated data&lt;/h1&gt;
 &lt;p&gt;The example above might seem a bit ad hoc (which is true) but it is motivated by possibly real scenarios. I’ll demonstrate by simulating a small (100 observations) dataset from the example problem presented above and fit to it a simple decision tree. Below is the resulting tree:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-1-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the tree completely ignored the treatment! To see why that happened let’s take a look at the dataset distribution:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/figure-html/unnamed-chunk-2-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see in the graph above 2 dataset features that could potentially throw off regular ML algorithms when in comes to CI tasks:&lt;/p&gt;
 &lt;ol style=&#34;list-style-type: decimal&#34;&gt;
 &lt;li&gt;The variability due to the treatment is very small compared with that of other features in the dataset leading to an underestimate of the treatment effect (In the graph the variability due to company size is much higher than that of the treatment, which is why the decision tree disregarded the treatment).&lt;br /&gt;
@@ -1776,7 +1994,7 @@ pandoc.table(educ_ate_on_vocab,
 &lt;div id=&#34;ate&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;ATE&lt;/h2&gt;
 &lt;p&gt;Below I plot the estimated &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; box-plots along with the true &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; (dashed line).&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20ATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20ATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the error distribution doesn’t change the picture much. For that reason &lt;span class=&#34;math inline&#34;&gt;\(RMSE_{ATE}\)&lt;/span&gt; figures in the table below are averages over all error distributions:&lt;/p&gt;
 &lt;table style=&#34;width:53%;&#34;&gt;
 &lt;colgroup&gt;
@@ -1831,7 +2049,7 @@ pandoc.table(educ_ate_on_vocab,
 &lt;div id=&#34;cate&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;CATE&lt;/h2&gt;
 &lt;p&gt;Below I plot &lt;span class=&#34;math inline&#34;&gt;\(R^{2}_{CATE}\)&lt;/span&gt; box-plots and a red line at 0. We note that while in ML we’d usually think of &lt;span class=&#34;math inline&#34;&gt;\(R^{2} = 0\)&lt;/span&gt; as the baseline which is equal to “guessing” (since if we guess &lt;span class=&#34;math inline&#34;&gt;\(\hat{y}_i = \bar{y} \: \forall \, i\)&lt;/span&gt; we get &lt;span class=&#34;math inline&#34;&gt;\(R^{2} = 0\)&lt;/span&gt;) that wouldn’t be the case in CI. We note that &lt;span class=&#34;math inline&#34;&gt;\(\bar{CATE} = ATE\)&lt;/span&gt;, meaning in CI the equivalent of guessing &lt;span class=&#34;math inline&#34;&gt;\(\hat{y}_i = \bar{y} \: \forall \, i\)&lt;/span&gt; is guessing &lt;span class=&#34;math inline&#34;&gt;\(\hat{CATE}(z) = ATE \: \forall \, z\)&lt;/span&gt; and as we saw above that estimating the &lt;span class=&#34;math inline&#34;&gt;\(ATE\)&lt;/span&gt; isn’t always straight forward.&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20CATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/causal-inference-bake-off-kaggle-style_files/figure-html/plot%20CATE%20perf-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Below I report the resulting average &lt;span class=&#34;math inline&#34;&gt;\(\bar{R^{2}}_{CATE}\)&lt;/span&gt;, averaging over all &lt;span class=&#34;math inline&#34;&gt;\(M\)&lt;/span&gt; datasets and all error types:&lt;/p&gt;
 &lt;table style=&#34;width:51%;&#34;&gt;
 &lt;colgroup&gt;
@@ -1894,15 +2112,15 @@ pandoc.table(educ_ate_on_vocab,
     
     <item>
       <title>&#34;X affects Y&#34;. What does that even mean?</title>
-      <link>/2019/03/13/x-affects-y-what-does-that-even-mean/</link>
+      <link>https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/</link>
       <pubDate>Wed, 13 Mar 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/03/13/x-affects-y-what-does-that-even-mean/</guid>
+      <guid>https://iyarlin.github.io/2019/03/13/x-affects-y-what-does-that-even-mean/</guid>
       <description>
 
 
 &lt;div class=&#34;figure&#34;&gt;
-&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/jumbotron.jpg&#34; /&gt;
+&lt;img src=&#34;https://iyarlin.github.io/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/jumbotron.jpg&#34; /&gt;
 
 &lt;/div&gt;
 &lt;p&gt;On my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt; I gave an intuitive demonstration of what’s causal inference and how it’s different than classic ML.&lt;/p&gt;
@@ -1945,10 +2163,10 @@ comp = \epsilon_4
 &lt;p&gt;We can think of the equations above as some data generating process (DGP) underlying our simulated dataset. Let’s label that process &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; with “obs” standing for “observed”.&lt;/p&gt;
 &lt;p&gt;Below I generate a sample &lt;span class=&#34;math inline&#34;&gt;\(\{sales_i, mkt_i, comp_i, visits_i\}, \, i \in 1, \dots, 10000\)&lt;/span&gt; and fit a linear regression model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + r_2visits + r_3comp + \epsilon\)&lt;/span&gt; on the first 8000 observations.&lt;/p&gt;
 &lt;p&gt;The &lt;span class=&#34;math inline&#34;&gt;\(PD\)&lt;/span&gt; plot between mkt and sales is shown below:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/simulate%20DGP%20obs-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/simulate%20DGP%20obs-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the line is essentially flat, indicating no effect, though in fact we know that the line slope should be 0.15 (since &lt;span class=&#34;math inline&#34;&gt;\(\beta_1 \cdot \beta_3=0.15\)&lt;/span&gt;).&lt;/p&gt;
 &lt;p&gt;This seems quite surprising (though those who read my &lt;a href=&#34;https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/&#34;&gt;last post&lt;/a&gt; saw that result where the coefficient for mkt in the full ML model was around 0). The PDP shows none-sense results even though our model, while not perfect does capture a considerable degree of signal as shown in the plot of predicted vs actual sales (in the hold out test set of 2000 observations) below:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/ML%20model%20accuracy-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/ML%20model%20accuracy-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;the-do-operator&#34; class=&#34;section level1&#34;&gt;
 &lt;h1&gt;The “do” operator&lt;/h1&gt;
@@ -1956,7 +2174,7 @@ comp = \epsilon_4
 &lt;p&gt;We need to make a distinction between when we observe a feature &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; taking some specific value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; in which case we write &lt;span class=&#34;math inline&#34;&gt;\(X=x\)&lt;/span&gt;, and when we “force” or set &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; to some value &lt;span class=&#34;math inline&#34;&gt;\(x\)&lt;/span&gt; in which case we write &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt;.&lt;/p&gt;
 &lt;p&gt;In order to understand the nature of the distinction between observing and setting &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; (or &lt;span class=&#34;math inline&#34;&gt;\(X=x\)&lt;/span&gt; vs &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt;) we first need to understand that by setting &lt;span class=&#34;math inline&#34;&gt;\(do(X=x)\)&lt;/span&gt; we change how future samples are generated. In our example setting &lt;span class=&#34;math inline&#34;&gt;\(do(mkt = x)\)&lt;/span&gt; means we delete the 3rd equation above (&lt;span class=&#34;math inline&#34;&gt;\(mkt = \beta_4comp + \epsilon_3\)&lt;/span&gt;) as mkt is no longer a function of comp. After setting mkt the rest of the variables are generated according to the remaining equations. We arrive at a new data generating process we’ll label &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; from which samples are generated after we set the mkt value.&lt;/p&gt;
 &lt;p&gt;In the plot below I show the a scatter plot of mkt and sales generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{obs}}\)&lt;/span&gt; on the left and those generated by &lt;span class=&#34;math inline&#34;&gt;\(DGP_{\text{do(mkt = x)}}\)&lt;/span&gt; after setting mkt to different values on the right:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/sim%20DGP%20do-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-03-13-x-affects-y-what-does-that-even-mean_files/figure-html/sim%20DGP%20do-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the joint distribution of mkt and sales is dramatically different before and after setting mkt. When we observe &lt;span class=&#34;math inline&#34;&gt;\(mkt=x\)&lt;/span&gt; (on the left pane) usually there’s also high competition leading to lower sales. When we set &lt;span class=&#34;math inline&#34;&gt;\(do(mkt=x)\)&lt;/span&gt; (on the right pane) that is no longer the case and indeed sales increase with mkt as expected. Finding the causal effect in this case does not even require a very complex model: the line slope on the right pane is 0.15 (which is the true causal effect).&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;the-challenge-with-causal-inference&#34; class=&#34;section level1&#34;&gt;
@@ -1996,10 +2214,10 @@ comp = \epsilon_4
     
     <item>
       <title>&#34;Correlation does not imply causation&#34;. So what does?</title>
-      <link>/2019/02/08/correlation-is-not-causation-so-what-is/</link>
+      <link>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</link>
       <pubDate>Fri, 08 Feb 2019 00:00:00 +0000</pubDate>
       
-      <guid>/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
+      <guid>https://iyarlin.github.io/2019/02/08/correlation-is-not-causation-so-what-is/</guid>
       <description>
 
 
@@ -2088,7 +2306,7 @@ comp = \epsilon_4
 &lt;div id=&#34;first-approach-plot-bi-variate-relationship&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;First approach: plot bi-variate relationship&lt;/h2&gt;
 &lt;p&gt;Many of us would start off by plotting a scatter plot of sales by marketing:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20scatter%20plot-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20scatter%20plot-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;We can see that the relationship seen in the graph is actually the opposite of what we’d expected! It looks like increasing marketing actually decreases sales. Indeed, not only correlation isn’t causation, at times it can show a relation opposite to the true causation.&lt;/p&gt;
 &lt;p&gt;Fitting a simple linear model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + \epsilon\)&lt;/span&gt; would yield the following coefficients: (note &lt;span class=&#34;math inline&#34;&gt;\(r\)&lt;/span&gt; is a regression coefficient where’s &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; is a true parameter in the structural equations)&lt;/p&gt;
 &lt;table style=&#34;width:32%;&#34;&gt;
@@ -2147,7 +2365,7 @@ comp = \epsilon_4
 &lt;p&gt;Quite baffled by the results obtained so far we turn to consult the marketing team and we learn that in highly competitive markets the team would usually increase marketing spend (this is reflected in the coefficient &lt;span class=&#34;math inline&#34;&gt;\(\beta_4 = 0.6\)&lt;/span&gt; above). So it’s possible that competition is a “confounding” factor: when we observe high marketing spend there’s also high competition thus leading to lower sales.&lt;/p&gt;
 &lt;p&gt;Also, we notice that marketing probably affects visits to our site and those visits in turn affect sales.&lt;/p&gt;
 &lt;p&gt;We can visualize these feature inter-dependencies with a directed a-cyclic graph (DAG):&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;So it would make sense to account for the confounding competition by adding it to our regression. Adding visits to our model however somehow “blocks” or “absorbs” the effect of marketing on sales so we should omit it from our model.&lt;/p&gt;
 &lt;p&gt;Fitting the model &lt;span class=&#34;math inline&#34;&gt;\(sales = r_0 + r_1mkt + r_2comp + \epsilon\)&lt;/span&gt; yields the coefficients below:&lt;/p&gt;
 &lt;table style=&#34;width:44%;&#34;&gt;
@@ -2182,9 +2400,9 @@ comp = \epsilon_4
 &lt;h2&gt;Backdoor criteria&lt;/h2&gt;
 &lt;p&gt;One of the most basic algorithms that can obtain the correct adjustment set is the “Backdoor-criteria” developed by J. Pearl. In a nutshell it seeks adjustment sets that block every “spurious” paths between our “exposure” variable (e.g. marketing) and “outcome” variable (e.g. sales) while keeping directed baths open.&lt;/p&gt;
 &lt;p&gt;Consider for example the DAG below where we’re interested in finding the effect of x5 on x10:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20large%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20large%20DAG-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;p&gt;Using the backdoor-criterion (implemented in the R package “dagitty”) we can find the correct adjustment set:&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;/post/2019-02-08-i-try-this_files/figure-html/plot%20adjustemnt%20sets-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/2019-02-08-i-try-this_files/figure-html/plot%20adjustemnt%20sets-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
 &lt;/div&gt;
 &lt;div id=&#34;how-to-obtain-model-dags&#34; class=&#34;section level2&#34;&gt;
 &lt;h2&gt;How to obtain model DAGs?&lt;/h2&gt;

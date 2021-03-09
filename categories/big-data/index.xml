@@ -1,0 +1,233 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Big data on Just be-cause</title>
+    <link>https://iyarlin.github.io/categories/big-data/</link>
+    <description>Recent content in Big data on Just be-cause</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 09 Mar 2021 00:00:00 +0000</lastBuildDate>
+    
+        <atom:link href="https://iyarlin.github.io/categories/big-data/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>sparse matrix representation for ml in scale</title>
+      <link>https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/</link>
+      <pubDate>Tue, 09 Mar 2021 00:00:00 +0000</pubDate>
+      
+      <guid>https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/</guid>
+      <description>
+
+
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sparse_matrix_representation_for_ml_in_scale_files/Andromeda_Galaxy_560mm_FL.jpeg&#34; width=&#34;600&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Am I the only one seeing here a sparse linear regression? Hopefully by the end
+of this post you’ll see it too (:&lt;/p&gt;
+&lt;p&gt;Its been a while since my last blog post as I’ve started working at
+&lt;a href=&#34;https://www.similarweb.com/&#34;&gt;SimilarWeb&lt;/a&gt; - A
+company that provides data on internet traffic for various use cases. During
+this time I’ve encountered an interesting ML problem setup that requires
+dealing with quite a few technical hurdles. In this blog post I’d like to share
+the problem and Scala spark recipe code to tackle it at scale.&lt;/p&gt;
+&lt;div id=&#34;some-motivation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Some motivation&lt;/h2&gt;
+&lt;p&gt;Since I can’t really divulge the specifics of the problem I’m working on I’ll
+illustrate the problem setup with a (possibly) imaginary scenario.&lt;/p&gt;
+&lt;p&gt;Let’s imagine we’re working for a credit card company. We issue credit cards to
+consumers who go and spend money at different businesses. Knowing the monthly
+revenue those business generate can be instrumental for pricing and marketing
+purposes.&lt;/p&gt;
+&lt;p&gt;To try and estimate business monthly revenue we asked a
+small subset of the businesses to disclose their last month
+revenue. We’ll denote the last month revenue for business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt; by &lt;span class=&#34;math inline&#34;&gt;\(y_i\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;Next, we have at our disposal purchase information from our credit card holders.
+Let’s denote the total money spent by customer &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt; at business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt; by &lt;span class=&#34;math inline&#34;&gt;\(x_{ij}\)&lt;/span&gt;.&lt;/p&gt;
+&lt;p&gt;We can assume that the total purchases by our credit card holders at a given
+business &lt;span class=&#34;math inline&#34;&gt;\(i\)&lt;/span&gt;: &lt;span class=&#34;math inline&#34;&gt;\(x_i=\Sigma x_{ij}\)&lt;/span&gt; represents only a fraction of the total revenue
+&lt;span class=&#34;math inline&#34;&gt;\(y_i\)&lt;/span&gt;. We can thus assume that there’s some inflation factor &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; such that:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[y_i = x_i \beta + \epsilon_i\]&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Estimation of &lt;span class=&#34;math inline&#34;&gt;\(\beta\)&lt;/span&gt; would amount to a simple regression. We can then use the
+model to estimate monthly revenue for all the other businesses where our card
+holders are spending money.&lt;/p&gt;
+&lt;p&gt;Taking the above idea one step further, we can imagine that different card
+holders might represent very different purchasing patterns, which could
+necessitate different inflation factor &lt;span class=&#34;math inline&#34;&gt;\(\beta_j\)&lt;/span&gt; for every consumer &lt;span class=&#34;math inline&#34;&gt;\(j\)&lt;/span&gt;.
+This would amount to assuming that:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[y_i = \Sigma x_{ij}\beta_j + \epsilon_i\]&lt;/span&gt;
+and in matrix notation:&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;math display&#34;&gt;\[Y=X\beta + \epsilon\]&lt;/span&gt;
+Estimation of the above equation might seem like a simple regression but in
+practice it introduces several challenges:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;&lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is usually very large. It would span as many rows as we have businesses
+in our sample and as many columns as the number of credit card holders. In my
+application I had 70K rows on 1.8M columns (which roughly translates to 470 GB
+assuming we encode the matrix entries as integer).&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; can have many more columns than it has rows. This kind of matrix is
+&lt;a href=&#34;https://en.wikipedia.org/wiki/Rank_(linear_algebra)#:~:text=%20A%20matrix%20is%20said%20to%20be%20rank%2Deficient%20if%20it,given%20by%20mult%20iplication%20by%20A.&#34;&gt;rank defiecient&lt;/a&gt; which in practice means we can’t calculate the closed
+form solution (there’s actually infinite solutions).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;div id=&#34;sparse-linear-regression-in-scala-spark&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Sparse linear regression in scala spark&lt;/h2&gt;
+&lt;p&gt;Luckily enough Spark Scala has all the tools needed to tackle the above problem
+at scale!&lt;/p&gt;
+&lt;p&gt;First, we note that while &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; is pretty huge, it’s also usually very sparse. In
+my application it had the value 0 in 99.95% of it’s entries. That means we can use sparse
+matrix representation to avoid blowing up our memory.&lt;/p&gt;
+&lt;p&gt;Next, we discover that the spark ml linear regression implementation can fit
+the model using gradient descent rather than using the closed form solution.
+This means we can solve the above optimization problem and arrive at one (of
+infinite) solutions to the equation.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;code-receipe&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Code receipe&lt;/h2&gt;
+&lt;p&gt;Note: The below assumes spark 3.0+&lt;/p&gt;
+&lt;p&gt;A reasonable place to start our code example is to assume we have some
+transnational DataFrame &lt;em&gt;user_df&lt;/em&gt; for a given month with the following schema:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;user_id: StringType&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;business_id: IntegerType&lt;/li&gt;
+&lt;li&gt;amount_spent: DoubleType&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import spark.implicits._
+
+val user_df = Seq(
+  (&amp;quot;ad3a&amp;quot;, 1, 14.0), 
+  (&amp;quot;ad3a&amp;quot;, 0, 13.0), 
+  (&amp;quot;3Gd2e&amp;quot;, 1, 11.0)
+).toDF(&amp;quot;user_id&amp;quot;, &amp;quot;business_id&amp;quot;, &amp;quot;amount_spent&amp;quot;)
+
+user_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-------+-----------+------------+
+## |user_id|business_id|amount_spent|
+## +-------+-----------+------------+
+## |   ad3a|          1|        14.0|
+## |   ad3a|          0|        13.0|
+## |  3Gd2e|          1|        11.0|
+## +-------+-----------+------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We also have a DataFrame containing a sample of businesses total revenues
+&lt;em&gt;biz_df&lt;/em&gt;:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;business_id: IntegerType&lt;br /&gt;
+&lt;/li&gt;
+&lt;li&gt;total_revenue: FloatType&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;val biz_df = Seq(
+  (0, 13.9), 
+  (1, 36.7)
+).toDF(&amp;quot;business_id&amp;quot;, &amp;quot;total_revenue&amp;quot;)
+
+biz_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----------+-------------+
+## |business_id|total_revenue|
+## +-----------+-------------+
+## |          0|         13.9|
+## |          1|         36.7|
+## +-----------+-------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s start with some preprocesssing in the &lt;em&gt;user_df&lt;/em&gt; DataFrame. First, we need
+to convert &lt;em&gt;user_id&lt;/em&gt;s to column index in the &lt;span class=&#34;math inline&#34;&gt;\(X\)&lt;/span&gt; matrix. This means every user
+needs to have an integer denoting the matrix column index that represents his
+spending. Spark has a great utility that can serve that purpose: &lt;em&gt;StringIndexer&lt;/em&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.feature.StringIndexer
+val stringIndexer = new StringIndexer()
+.setInputCol(&amp;quot;user_id&amp;quot;)
+.setOutputCol(&amp;quot;userIndex&amp;quot;)
+
+val stringIndexerModel = stringIndexer.fit(user_df)
+
+user_df = stringIndexerModel
+.transform(user_df)
+.withColumn(&amp;quot;userIndex&amp;quot;, $&amp;quot;userIndex&amp;quot;.cast(&amp;quot;Int&amp;quot;))
+
+user_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-------+-----------+------------+---------+
+## |user_id|business_id|amount_spent|userIndex|
+## +-------+-----------+------------+---------+
+## |   ad3a|          1|        14.0|        0|
+## |   ad3a|          0|        13.0|        0|
+## |  3Gd2e|          1|        11.0|        1|
+## +-------+-----------+------------+---------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Next, we’ll collect for every business the users who spent money with them and
+the corresponding amounts. In the below code we’ll also join in the business total revenue too:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions._
+val sortUdf: UserDefinedFunction = udf((rows: Seq[Row]) =&amp;gt; {
+  rows.map { case Row(userIndex: Int, amount_spent: Double) =&amp;gt; (userIndex, amount_spent) }
+    .sortBy { case (userIndex, amount_spent) =&amp;gt; userIndex }
+})
+
+
+val user_business_amount_spent_df = user_df
+.groupBy(&amp;quot;business_id&amp;quot;)
+.agg(collect_list(struct(&amp;quot;userIndex&amp;quot;, &amp;quot;amount_spent&amp;quot;)).alias(&amp;quot;user_amount_spent_list&amp;quot;))
+.select($&amp;quot;business_id&amp;quot;, sortUdf($&amp;quot;user_amount_spent_list&amp;quot;).alias(&amp;quot;user_amount_spent_list&amp;quot;))
+.withColumn(&amp;quot;userIndex_list&amp;quot;, $&amp;quot;user_amount_spent_list&amp;quot;.getField(&amp;quot;_1&amp;quot;))
+.withColumn(&amp;quot;amount_spent_list&amp;quot;, $&amp;quot;user_amount_spent_list&amp;quot;.getField(&amp;quot;_2&amp;quot;))
+.drop(&amp;quot;user_amount_spent_list&amp;quot;)
+.join(biz_df, &amp;quot;business_id&amp;quot;)
+
+user_business_amount_spent_df.show()&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----------+--------------+-----------------+-------------+
+## |business_id|userIndex_list|amount_spent_list|total_revenue|
+## +-----------+--------------+-----------------+-------------+
+## |          1|        [0, 1]|     [14.0, 11.0]|         36.7|
+## |          0|           [0]|           [13.0]|         13.9|
+## +-----------+--------------+-----------------+-------------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Note that we use the UDF above to ensure user user indices are in ascending
+order as the &lt;em&gt;collect_list&lt;/em&gt; function does not ensure any specific ordering.&lt;/p&gt;
+&lt;p&gt;Now, all there’s left to do is represent every row as a sparse vector and
+it’s corresponding label. I’ve also created a small case class that retains
+the &lt;em&gt;business_id&lt;/em&gt; identifier:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.linalg.SparseVector
+case class LabeledPoint2(label: Double, features: SparseVector, business: Int)
+val num_columns = stringIndexerModel.labelsArray.size + 1
+val sparse_user_business_amount_spent_df = user_business_amount_spent_df
+.map(r =&amp;gt; LabeledPoint2(r.getDouble(3), 
+                       new SparseVector(size = num_columns, 
+                                        indices = r.getAs[Seq[Int]](&amp;quot;userIndex_list&amp;quot;).toArray, 
+                                        values = r.getAs[Seq[Double]](&amp;quot;amount_spent_list&amp;quot;).toArray), 
+                       r.getInt(0)))
+
+sparse_user_business_amount_spent_df.show(truncate=false)&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## 
+## +-----+---------------------+--------+
+## |label|features             |business|
+## +-----+---------------------+--------+
+## |36.7 |(2,[0,1],[14.0,11.0])|1       |
+## |13.9 |(2,[0],[13.0])       |0       |
+## +-----+---------------------+--------+
+## &lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;and voila - there you have it - our matrix is encoded sparsely, enabling us
+to conveniently store it in memory and fitting to it all models available in spark
+ml in a scalable manner! In my application fitting a linear regression took
+20-30 minutes.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;import org.apache.spark.ml.regression.LinearRegression
+val lr = new LinearRegression()
+.setFitIntercept(false)
+
+val lrModel = lr.fit(sparse_user_business_amount_spent_df)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see our regression arrived at the correct betas (1,2):&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;lrModel.coefficients&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code&gt;## [1] &amp;quot;org.apache.spark.ml.linalg.Vector = [1.0692307692307697,1.9755244755244754]&amp;quot;&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;One interesting fact about the above problem setup is that since it has more
+columns than rows it fits the training data perfectly (resulting in 0 training
+error).
+While this usually indicates overfitting, the above model performs pretty well
+in my application. This probably has to do with a phenomenon called “double descent
+risk curve”. More on that on my next post!&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

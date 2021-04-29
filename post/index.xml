@@ -5,10 +5,216 @@
     <description>Recent content in Posts on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 09 Mar 2021 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 29 Apr 2021 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="https://iyarlin.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Don&#39;t be fooled by the hype python&#39;s got</title>
+      <link>https://iyarlin.github.io/2021/04/29/dont_be_fooled_by_the_hype_pythons_got/</link>
+      <pubDate>Thu, 29 Apr 2021 00:00:00 +0000</pubDate>
+      
+      <guid>https://iyarlin.github.io/2021/04/29/dont_be_fooled_by_the_hype_pythons_got/</guid>
+      <description>
+
+
+&lt;div id=&#34;r-still-r-still-is-the-tool-you-want&#34; class=&#34;section level1&#34;&gt;
+&lt;h1&gt;R still R still is the tool you want&lt;/h1&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dont_be_fooled_by_the_hype_pythons_got/jenny_from_the_block.gif&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;We all know python popularity among DS practitioners has soared over the past
+few years, signaling both aspiring DS on the one hand and organizations on the
+other to favor python over R in a snowballing dynamic.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;I’m writing this post to help turn the tide and let us all keep writing in the
+language we love and are most productive with. Feel free to join in on the effort
+by contributing to the &lt;a href=&#34;https://github.com/IyarLin/R-advantages-over-python#readme&#34;&gt;“R advantages over python” repo&lt;/a&gt;
+and by joining the discussion on this post on &lt;a href=&#34;https://towardsdatascience.com/dont-be-fooled-by-the-hype-python-s-got-c92183ab33ea&#34;&gt;Medium&lt;/a&gt; and my blog.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;One popular way of demonstrating the rise of python is to plot the fraction of
+questions asked on stack overflow with the tag “pandas”, compared with “dplyr”:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dont_be_fooled_by_the_hype_pythons_got/stack_overflow_trends.png&#34; width=&#34;500&#34; height=&#34;300&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;But there is also another story this graph is telling: All those new pandas users
+search stack overflow excessively because pandas is really unintelligible.
+Later in this post I’ll provide several examples of common operations that in
+dplyr are straightforward yet in pandas would require most of us to search stack
+overflow.&lt;/p&gt;
+&lt;p&gt;I’m a big believer in using the right tool for the job (I’ve been writing Scala
+Spark for the last 6 months for our Java based production environment). It has
+become common wisdom that for most data scientists &lt;a href=&#34;https://datascience.stackexchange.com/questions/48531/how-much-of-data-wrangling-is-a-data-scientists-job&#34;&gt;data wrangling makes up most
+of the job&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/dont_be_fooled_by_the_hype_pythons_got/datascientist.png&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Taken with permission from &lt;a href=&#34;https://scientistcafe.com/2017/03/25/whatisdatascience.htmlWhile&#34;&gt;here&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;It follows that dplyr users enjoy a productivity boost most of the time compared
+with pandas users. R has the edge in a wide range of other areas too: available
+IDEs, package management, data constructs and many others.&lt;/p&gt;
+&lt;p&gt;Those advantages are so numerous that covering them all in a single post would be
+impractical. To that end I’ve started compiling all the advantages R has over python
+in a dedicated &lt;a href=&#34;https://github.com/IyarLin/R-advantages-over-python#readme&#34;&gt;github repo&lt;/a&gt;.
+I plan on sharing them in small batches in a series of posts starting with this one.&lt;/p&gt;
+&lt;p&gt;When enumerating the different reasons I try to avoid the following:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Too subjective comparisons. E.g. function indentation vs curly braces closure&lt;/li&gt;
+&lt;li&gt;Issues that one can get used to after a while like python indexing (though the
+fact it starts from 0, or that object[0:2] returns only the first 2 elements still
+throws me off occasionally).&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;What do I hope to accomplish by this you’d might ask? I hope that:&lt;/p&gt;
+&lt;ol style=&#34;list-style-type: decimal&#34;&gt;
+&lt;li&gt;Organizations realize the value in working with R and choose to use it with/instead
+of python more often.&lt;/li&gt;
+&lt;li&gt;As a result the python developer community becomes aware of the ways it can
+improve it’s DS offering and acts on them. python has already borrowed some great
+concepts from R (e.g. data frames, &lt;a href=&#34;https://pandas.pydata.org/pandas-docs/stable/user_guide/categorical.html&#34;&gt;factor data type&lt;/a&gt;,
+&lt;a href=&#34;https://github.com/h2oai/datatable&#34;&gt;pydatatable&lt;/a&gt;, &lt;a href=&#34;https://plotnine.readthedocs.io/en/stable/&#34;&gt;ggplot&lt;/a&gt;) -
+it’s important it does so even more so we get to enjoy them when we have to work
+with python.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Now, I don’t argue R is preferable to python in every imaginable scenario. I just
+hope that becoming aware of the advantages R has to offer would encourage organizations
+to consider using it more often.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;OK, so now for the burden of proof. Below I’ll give a few examples that show why
+in dplyr most operations are straightforward while in pandas they often require
+searching stack overflow. Again - this is just why dplyr is much easier to work
+with than pandas. For other advantages R has over python see the &lt;a href=&#34;https://github.com/IyarLin/R-advantages-over-python#readme&#34;&gt;repo&lt;/a&gt;.
+We’ll start with a simple example: calculate the mean Sepal length within each
+species in the iris dataset.&lt;/p&gt;
+&lt;div id=&#34;aggregation&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Aggregation&lt;/h2&gt;
+&lt;p&gt;We’ll start with a simple example: calculate the mean Sepal length within each
+species in the iris dataset.&lt;/p&gt;
+&lt;p&gt;In dplyr:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  summarise(mean_length = mean(Sepal.Length))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;A common way of doing the same in pandas would be using the &lt;em&gt;agg&lt;/em&gt; method:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;(
+  iris.groupby(&amp;#39;Species&amp;#39;).agg({&amp;#39;Sepal.Length&amp;#39;:&amp;#39;mean&amp;#39;})
+  .rename({&amp;#39;Sepal.Length&amp;#39;:&amp;#39;mean_length&amp;#39;}, axis = 1)
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see that pandas requires an additional &lt;em&gt;rename&lt;/em&gt; call.&lt;/p&gt;
+&lt;p&gt;We can avoid the additional &lt;em&gt;rename&lt;/em&gt; by passing a tuple to &lt;em&gt;agg&lt;/em&gt;:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;iris.groupby(&amp;#39;Species&amp;#39;).agg(mean_length = (&amp;#39;Sepal.Length&amp;#39;, &amp;#39;mean&amp;#39;))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;While this looks much closer to the dplyr syntax, it also highlights the fact
+there’s multiple ways of using the &lt;em&gt;agg&lt;/em&gt; method - contrary to common wisdom that
+in R there are many ways to do the same thing while in python there’s only a
+single obvious way.&lt;/p&gt;
+&lt;p&gt;Now let’s say we’d like to use a weighted average (with sepal width as weights).&lt;/p&gt;
+&lt;p&gt;In dplyr we’d use the weighted mean function with an additional argument:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  summarize(weighted_mean_length = weighted.mean(Sepal.Length, Sepal.Width))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Pretty straight forward. In fact, it’s so straight forward we can do the actual
+weighted mean calculation on the fly:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  summarize(weighted_mean_length = sum(Sepal.Length * Sepal.Width) / sum(Sepal.Width))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In pandas it’s not so simple. One can’t just tweak the above examples. To come
+up with a pandas version I had to search stack overflow and based on
+&lt;a href=&#34;https://stackoverflow.com/a/10964938/5472037&#34;&gt;this&lt;/a&gt; and
+&lt;a href=&#34;https://stackoverflow.com/a/47103408/5472037&#34;&gt;this&lt;/a&gt; answers I got:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;def weighted_mean(group):
+    d = {}
+    x = group[&amp;#39;Sepal.Length&amp;#39;]
+    w = group[&amp;#39;Sepal.Width&amp;#39;]
+    d[&amp;#39;weighted_mean_length&amp;#39;] = (x * w).sum() / w.sum()
+    return pd.Series(d, index=[&amp;#39;weighted_mean_length&amp;#39;])
+
+sepal_length_to_width_ratio = (
+  iris
+  .groupby(&amp;#39;Species&amp;#39;)
+  .apply(weighted_mean)
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see that:&lt;br /&gt;
+1. We have to define a custom function, and it can’t even work for general inputs&lt;br /&gt;
+but rather has to have them hard coded.&lt;br /&gt;
+2. The syntax is super cumbersome and requires searching stack overflow.&lt;br /&gt;
+3. We need to use &lt;em&gt;apply&lt;/em&gt; instead of the common &lt;em&gt;agg&lt;/em&gt; method.&lt;br /&gt;
+4. I’m pretty sure anyone not using the above code for more than a few weeks
+would have to search stack overflow/his code base again to find the answer next
+time he needs to do that calculation.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;window-functions&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Window functions&lt;/h2&gt;
+&lt;div id=&#34;aggregation-over-a-window&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Aggregation over a window&lt;/h3&gt;
+&lt;p&gt;Let’s say we’d like to calculate the mean of sepal length within each species
+and append that to the original dataset (In SQL: SUM(Sepal.Length) OVER(partition by Species)) would be:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;iris.assign(mean_sepal = lambda x: x.groupby(&amp;#39;Species&amp;#39;)[&amp;#39;Sepal.Length&amp;#39;].transform(np.mean))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;We can see that this requires a dedicated method (&lt;em&gt;transform&lt;/em&gt;), compared with
+dplyr which only requires adding a group_by:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  mutate(mean_sepal = mean(Sepal.Length))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now let’s say we’d like to do the same with a function that takes 2 argument
+variables. In dplyr it’s pretty straight forward and again,
+just a minor and intuitive tweak of the previous code:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  mutate(mean_sepal = weighted.mean(Sepal.Length, Sepal.Width))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;I wasn’t able to come up with a way to use a function with more than 1 input
+such as weighted mean in pandas.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;expanding-windows&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Expanding windows&lt;/h3&gt;
+&lt;p&gt;Now let’s say we’d like to calculate an expanding sum of Sepal.Length over increasing
+values of Sepal.Width within each species (in SQL: SUM(Sepal.Length)
+OVER(partition by Species ORDER BY Sepal.Width))&lt;/p&gt;
+&lt;p&gt;In dplyr it’s pretty straight forward:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  arrange(Species, Sepal.Width) %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  mutate(expanding_sepal_sum = sapply(1:n(), function(x) sum(Sepal.Length[1:x])))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Notice we don’t need to memorize any additional functions/methods. You find
+a solution using ubiquitous tools (e.g. sapply) and just plug it in the dplyr
+chain.&lt;/p&gt;
+&lt;p&gt;In pandas we’ll have to search stack overflow to come up with the &lt;em&gt;expanding&lt;/em&gt;
+method:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;(
+  iris.sort_values([&amp;#39;Species&amp;#39;, &amp;#39;Sepal.Width&amp;#39;]).groupby(&amp;#39;Species&amp;#39;)
+  .expanding().agg({&amp;#39;Sepal.Length&amp;#39;: &amp;#39;sum&amp;#39;})
+  .rename({&amp;#39;Sepal.Length&amp;#39;:&amp;#39;expanding_sepal_sum&amp;#39;}, axis = 1)
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Again, we need to use an additional &lt;em&gt;rename&lt;/em&gt; call.&lt;/p&gt;
+&lt;p&gt;You’d might want to pass a tuple to &lt;em&gt;agg&lt;/em&gt; like you’re used to in order to avoid
+the additional &lt;em&gt;rename&lt;/em&gt; but for some reason the following syntax just wont work:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;(
+  iris.sort_values([&amp;#39;Species&amp;#39;, &amp;#39;Sepal.Width&amp;#39;]).groupby(&amp;#39;Species&amp;#39;)
+  .expanding().agg(expanding_sepal_sum = (&amp;#39;Sepal.Length&amp;#39;, &amp;#39;sum&amp;#39;))
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You could also avoid the additional rename by using the following eye sore:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;(
+  iris.assign(expanding_sepal_sum = lambda x:x.sort_values([&amp;#39;Species&amp;#39;, &amp;#39;Sepal.Width&amp;#39;])
+                .groupby(&amp;#39;Species&amp;#39;).expanding().agg({&amp;#39;Sepal.Length&amp;#39;: &amp;#39;sum&amp;#39;})
+                .reset_index()[&amp;#39;Sepal.Length&amp;#39;])
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;moving-windows&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Moving windows&lt;/h3&gt;
+&lt;p&gt;Now let’s say we’d like to calculate a moving central window mean (in SQL: AVG(Sepal.Length)
+OVER(partition by Species ORDER BY Sepal.Width ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING))&lt;/p&gt;
+&lt;p&gt;As usual, in dplyr it’s pretty straightforward:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;iris %&amp;gt;%
+  arrange(Species, Sepal.Width) %&amp;gt;%
+  group_by(Species) %&amp;gt;%
+  mutate(moving_mean_sepal_length = sapply(
+    1:n(),
+    function(x) mean(Sepal.Length[max(x - 2, 1):min(x + 2, n())])
+  ))&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;As in the other examples, all you have to do is find a solution using ubiquitous
+tools and plug it in the dplyr chain.&lt;/p&gt;
+&lt;p&gt;In pandas we’d have to look up the &lt;em&gt;rolling&lt;/em&gt; method, read it’s documentation and
+come up with the following:&lt;/p&gt;
+&lt;pre class=&#34;python&#34;&gt;&lt;code&gt;(
+  iris.sort_values([&amp;#39;Species&amp;#39;, &amp;#39;Sepal.Width&amp;#39;]).groupby(&amp;#39;Species&amp;#39;)
+  .rolling(window = 5, center = True, min_periods = 1).agg({&amp;#39;Sepal.Length&amp;#39;: &amp;#39;mean&amp;#39;})
+  .rename({&amp;#39;Sepal.Length&amp;#39;:&amp;#39;moving_mean_sepal_length&amp;#39;}, axis = 1)
+)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;That’s it for this post. If you’re still not a convert watch out for more examples on the next post in this series. You can also check out more examples in the “R advantages over python” &lt;a href=&#34;https://github.com/IyarLin/R-advantages-over-python#readme&#34;&gt;repo&lt;/a&gt;.&lt;/p&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>sparse matrix representation for ml in scale</title>

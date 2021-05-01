@@ -3,46 +3,6 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https://iyarlin.github.io/tags/coding/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/2021/04/29/dont_be_fooled_by_the_hype_pythons_got/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/post/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/python/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/r/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/r-vs-python/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/</loc>
-    <lastmod>2021-04-29T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://iyarlin.github.io/tags/apache-spark/</loc>
     <lastmod>2021-03-09T00:00:00+00:00</lastmod>
   </url>
@@ -63,12 +23,27 @@
   </url>
   
   <url>
+    <loc>https://iyarlin.github.io/</loc>
+    <lastmod>2021-03-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/post/</loc>
+    <lastmod>2021-03-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
     <loc>https://iyarlin.github.io/tags/scala/</loc>
     <lastmod>2021-03-09T00:00:00+00:00</lastmod>
   </url>
   
   <url>
     <loc>https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/</loc>
+    <lastmod>2021-03-09T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/</loc>
     <lastmod>2021-03-09T00:00:00+00:00</lastmod>
   </url>
   
@@ -84,6 +59,11 @@
   
   <url>
     <loc>https://iyarlin.github.io/2020/05/26/dtplyr_benchmarks/</loc>
+    <lastmod>2020-05-26T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/r/</loc>
     <lastmod>2020-05-26T00:00:00+00:00</lastmod>
   </url>
   
@@ -104,6 +84,11 @@
   
   <url>
     <loc>https://iyarlin.github.io/2020/04/20/dowhy_exploration/</loc>
+    <lastmod>2020-04-20T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/python/</loc>
     <lastmod>2020-04-20T00:00:00+00:00</lastmod>
   </url>
   

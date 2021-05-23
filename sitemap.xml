@@ -4,7 +4,42 @@
   
   <url>
     <loc>https://iyarlin.github.io/categories/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/ml/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/post/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/r/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/categories/r/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/2021/05/23/sample_wise_double_descent_results_reproduction/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://iyarlin.github.io/tags/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
   </url>
   
   <url>
@@ -18,37 +53,12 @@
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/post/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://iyarlin.github.io/tags/python/</loc>
     <lastmod>2021-05-02T00:00:00+00:00</lastmod>
   </url>
   
   <url>
-    <loc>https://iyarlin.github.io/tags/r/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/categories/r/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
     <loc>https://iyarlin.github.io/tags/r-vs-python/</loc>
-    <lastmod>2021-05-02T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/</loc>
     <lastmod>2021-05-02T00:00:00+00:00</lastmod>
   </url>
   
@@ -144,11 +154,6 @@
   
   <url>
     <loc>https://iyarlin.github.io/tags/hands-on/</loc>
-    <lastmod>2019-05-20T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>https://iyarlin.github.io/tags/ml/</loc>
     <lastmod>2019-05-20T00:00:00+00:00</lastmod>
   </url>
   

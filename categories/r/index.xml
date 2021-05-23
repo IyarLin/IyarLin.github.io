@@ -5,10 +5,111 @@
     <description>Recent content in R on Just be-cause</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 02 May 2021 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 23 May 2021 00:00:00 +0000</lastBuildDate>
     
         <atom:link href="https://iyarlin.github.io/categories/r/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Sometimes more data can hurt!</title>
+      <link>https://iyarlin.github.io/2021/05/23/sample_wise_double_descent_results_reproduction/</link>
+      <pubDate>Sun, 23 May 2021 00:00:00 +0000</pubDate>
+      
+      <guid>https://iyarlin.github.io/2021/05/23/sample_wise_double_descent_results_reproduction/</guid>
+      <description>
+&lt;script src=&#34;https://iyarlin.github.io/rmarkdown-libs/header-attrs/header-attrs.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sample_wise_double_descent_results_reproduction_files/ben-white-qDY9ahp0Mto-unsplash.jpg&#34; width=&#34;600&#34; height=&#34;400&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Photo by &lt;a href=&#34;https://unsplash.com/@benwhitephotography?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText&#34;&gt;Ben White&lt;/a&gt; on &lt;a href=&#34;https://unsplash.com/s/photos/wow?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText&#34;&gt;Unsplash&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;So here’s a mind blower: In some cases having more samples can actually reduce
+model performance. Don’t believe it? Neither did I! Read on to see how I demonstrate
+that phenomenon using a simulation study.&lt;/p&gt;
+&lt;div id=&#34;some-context&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Some context&lt;/h2&gt;
+&lt;p&gt;On a recent &lt;a href=&#34;https://iyarlin.github.io/2021/03/09/sparse_matrix_representation_for_ml_in_scale/&#34;&gt;blog post&lt;/a&gt;
+I’ve discussed a scalable sparse linear regression model I’ve developed at work.
+One of it’s interesting properties is that it’s an interpolating model - meaning
+it has 0-training error. This is because it’s over parameterized and thus can fit
+the training data perfectly.&lt;/p&gt;
+&lt;p&gt;While 0-training error is usually associated with over-fiting, the model seems to
+perform pretty well on the test set. Reports of hugely over-parameterized
+models that seem to not suffer from overfiting (especially in deep learning)
+have been accumulating in recent years and so the literature on subject.&lt;/p&gt;
+&lt;p&gt;My own model for example performs best with no regularization at all. Intrigued
+by this extraordinary behavior I set out to better understand what’s going on. I
+got a good intro to the subject in this &lt;a href=&#34;https://towardsdatascience.com/something-every-data-scientist-should-know-but-probably-doesnt-the-bias-variance-trade-off-25d97a17329d&#34;&gt;Medium post&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Since Artificial neural networks are very complex algorithms it’s a good idea to
+study the subject and build intuition in a simpler setting. This is done in the
+great paper &lt;a href=&#34;https://arxiv.org/pdf/1912.07242.pdf&#34;&gt;“More Data Can Hurt for Linear Regression: Sample-wise Double Descent”&lt;/a&gt;
+by Preetum Nakkiran.&lt;/p&gt;
+&lt;p&gt;I’ll briefly summarize the problem setup: Let’s assume we have data that
+is generated from a linear model with 1000 covariates (without intercept). For
+every sample size &lt;span class=&#34;math inline&#34;&gt;\(n\)&lt;/span&gt; we fit a linear regression and measure the MSE on a hold
+out test set.&lt;/p&gt;
+&lt;p&gt;In cases where &lt;span class=&#34;math inline&#34;&gt;\(n \geq 1000\)&lt;/span&gt; we fit a regular regression model. In cases
+where &lt;span class=&#34;math inline&#34;&gt;\(n&amp;lt;1000\)&lt;/span&gt; we have &lt;span class=&#34;math inline&#34;&gt;\(p&amp;gt;n\)&lt;/span&gt; and there’s no closed form solution since the
+inverse of the design matrix does not exist.&lt;/p&gt;
+&lt;p&gt;The equation &lt;span class=&#34;math inline&#34;&gt;\(Y=X\beta\)&lt;/span&gt; has infinite solutions in this case. Of those solutions,
+the solution which minimizes the coefficient L2 norm &lt;span class=&#34;math inline&#34;&gt;\(||\beta||_2^2\)&lt;/span&gt; has the
+lowest variance and thus should have the best performance on the test set (more on
+that in Nakkiran’s paper). We can find the minimum norm L2 solution using the
+Moore-Penrose generalized inverse of a matrix X implemented in the MASS package.&lt;/p&gt;
+&lt;p&gt;Below we can see the simulation results from the paper: we can see that
+somewhere around Num. Samples = 900 the test error actually blows up as the number
+of samples increases towards 1000:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sample_wise_double_descent_results_reproduction_files/original_paper_plot.png&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;I found that result a bit hard to believe! Worried this may be another case of
+&lt;a href=&#34;https://en.wikipedia.org/wiki/Replication_crisis&#34;&gt;replication crisis&lt;/a&gt; I decided
+I had to see that for myself. Hence in this post I’ll reproduce the paper results.&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;results-reproduction&#34; class=&#34;section level2&#34;&gt;
+&lt;h2&gt;Results reproduction&lt;/h2&gt;
+&lt;p&gt;First we setup the simulation parameters:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;beta &amp;lt;- runif(1000) # real coefficients
+beta &amp;lt;- beta/sqrt(sum(beta^2)) ## convert to a unit vector
+M &amp;lt;- 50 ## number of simulations
+N &amp;lt;- c(2, seq(100, 800, 100), seq(900, 990, 10), seq(991,1000,1), 
+       seq(1001, 1009, 1), seq(1010, 1100, 10), seq(1200, 2000, 100)) ## number of observations
+test_MSE &amp;lt;- matrix(nrow = length(N), ncol = M)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Below we perform the actual simulation:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;for (i in 1:length(N)){
+  for (m in 1:M){
+    print(paste0(&amp;quot;n=&amp;quot;, N[i], &amp;quot;, m=&amp;quot;, m))
+    # generate traininng data
+    X &amp;lt;- replicate(1000, rnorm(N[i]))
+    e &amp;lt;- rnorm(N[i], sd = 0.1)
+    y &amp;lt;- X %*% beta + e
+    
+    if (N[i] &amp;lt; 1000){
+      beta_hat &amp;lt;- ginv(X) %*% y # Moore-penrose generalized matrix inverse
+    } else {
+      dat &amp;lt;- as.data.frame(cbind(y, X))
+      names(dat)[1] &amp;lt;- &amp;quot;y&amp;quot;
+      lm_model &amp;lt;- lm(y ~ .-1, data = dat) # regular fit
+      beta_hat &amp;lt;- matrix(lm_model$coefficients, ncol = 1)
+    }
+    
+    # generate test set
+    X_test &amp;lt;- replicate(1000, rnorm(10000))
+    e_test &amp;lt;- rnorm(10000, sd = 0.1)
+    y_test &amp;lt;- X_test %*% beta + e_test
+    
+    # measure model accuracy
+    preds_test &amp;lt;- X_test %*% beta_hat
+    test_MSE[i, m] &amp;lt;- sqrt(mean((y_test - preds_test)^2))
+  }
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Let’s plot the results:&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;matplot(N, test_MSE, type = &amp;quot;p&amp;quot;, pch = &amp;quot;.&amp;quot;, ylim = c(0,5), 
+        xaxt = &amp;quot;n&amp;quot;, xlim = c(0,2000), ylab = &amp;quot;Test MSE&amp;quot;, xlab = &amp;quot;Num. Samples&amp;quot;)
+axis(1, at = seq(0,2000,250))
+lines(N, apply(test_MSE, 1, mean), col = &amp;quot;red&amp;quot;)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;https://iyarlin.github.io/post/sample_wise_double_descent_files/figure-html/unnamed-chunk-4-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+&lt;p&gt;Amazingly enough - we got the exact same results!&lt;/p&gt;
+&lt;/div&gt;
+</description>
+    </item>
     
     <item>
       <title>Don&#39;t be fooled by the hype python&#39;s got</title>

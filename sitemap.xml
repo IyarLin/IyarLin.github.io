@@ -5,9 +5,6 @@
     <loc>https://iyarlin.github.io/2022/06/07/better_churn_modeling/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://iyarlin.github.io/categories/</loc>
-    <lastmod>2022-06-07T00:00:00+00:00</lastmod>
-  </url><url>
     <loc>https://iyarlin.github.io/tags/churn/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
   </url><url>
@@ -20,10 +17,10 @@
     <loc>https://iyarlin.github.io/tags/ml/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://iyarlin.github.io/categories/ml/</loc>
+    <loc>https://iyarlin.github.io/post/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://iyarlin.github.io/post/</loc>
+    <loc>https://iyarlin.github.io/tags/simulation/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://iyarlin.github.io/tags/survival_analysis/</loc>
@@ -31,6 +28,9 @@
   </url><url>
     <loc>https://iyarlin.github.io/tags/</loc>
     <lastmod>2022-06-07T00:00:00+00:00</lastmod>
+  </url><url>
+    <loc>https://iyarlin.github.io/categories/</loc>
+    <lastmod>2021-05-23T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://iyarlin.github.io/tags/r/</loc>
     <lastmod>2021-05-23T00:00:00+00:00</lastmod>
@@ -75,9 +75,6 @@
     <lastmod>2020-05-26T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://iyarlin.github.io/2020/05/26/dtplyr_benchmarks/</loc>
-    <lastmod>2020-05-26T00:00:00+00:00</lastmod>
-  </url><url>
-    <loc>https://iyarlin.github.io/tags/simulation/</loc>
     <lastmod>2020-05-26T00:00:00+00:00</lastmod>
   </url><url>
     <loc>https://iyarlin.github.io/tags/causal-inference/</loc>
